@@ -2,7 +2,12 @@
 <html lang="de">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- Mobile: Zoom verhindern, Fullscreen erlauben -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#020617">
     <title>Neon Strike</title>
     <link rel="stylesheet" href="css/game.css">
 </head>
@@ -18,8 +23,11 @@
                     Katakis-Style Retro-Shooter: Waffen-Upgrades, Combo-System, Formationen, Boss-Fights.
                 </p>
                 <button id="startButton" type="button">Start Game</button>
-                <p class="hint">
-                    WASD / Pfeiltasten bewegen · Space schießen · K Bombe · P Pause · F Fullscreen · Combo = Bomb-Fragmente!
+                <p class="hint desktop-hint">
+                    WASD / Pfeiltasten bewegen · Space schießen · K Bombe · P Pause · F Fullscreen
+                </p>
+                <p class="hint mobile-hint" style="display:none">
+                    Touch: Links Joystick · Rechts Feuer/Bombe · Oben Pause
                 </p>
             </section>
         </div>
@@ -30,5 +38,14 @@
     </main>
 
     <script type="module" src="js/main.js"></script>
+    <script>
+        // Mobile-Hinweis anzeigen/verstecken
+        if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+            var dh = document.querySelector('.desktop-hint');
+            var mh = document.querySelector('.mobile-hint');
+            if (dh) dh.style.display = 'none';
+            if (mh) mh.style.display = '';
+        }
+    </script>
 </body>
 </html>

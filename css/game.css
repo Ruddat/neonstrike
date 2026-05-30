@@ -11,6 +11,9 @@ body {
     background: #020617;
     color: #e5f6ff;
     font-family: Arial, Helvetica, sans-serif;
+    /* Mobile: kein Bounce-Scrolling */
+    overscroll-behavior: none;
+    -webkit-overflow-scrolling: none;
 }
 
 body {
@@ -41,6 +44,11 @@ canvas {
     width: 100%;
     height: 100%;
     display: block;
+    /* Touch: Browser-Gesten unterbinden */
+    touch-action: none;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
 }
 
 .overlay {
@@ -148,4 +156,69 @@ button {
 .fs-btn:hover {
     background: rgba(56, 189, 248, .2);
     border-color: #38bdf8;
+}
+
+/* ===================== MOBILE ===================== */
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+    .game-shell {
+        width: 100vw;
+        height: 100vh;
+        max-width: 100vw;
+        max-height: 100vh;
+        aspect-ratio: auto;
+        border-radius: 0;
+        border: none;
+        box-shadow: none;
+    }
+
+    /* Fullscreen-Button auf Mobile verstecken (ist im HUD) */
+    .fs-btn {
+        display: none;
+    }
+
+    .hud-note {
+        display: none;
+    }
+
+    .menu-card {
+        padding: 22px;
+        border-radius: 18px;
+    }
+
+    h1 {
+        font-size: clamp(32px, 9vw, 56px);
+    }
+
+    .hint {
+        font-size: 12px;
+    }
+
+    .subtitle {
+        font-size: 13px;
+        margin: 12px 0 20px;
+    }
+}
+
+/* Fullscreen Mode */
+.game-shell:fullscreen {
+    width: 100vw;
+    height: 100vh;
+    max-width: 100vw;
+    max-height: 100vh;
+    aspect-ratio: auto;
+    border-radius: 0;
+    border: none;
+    box-shadow: none;
+}
+
+/* Safari Webkit Fullscreen */
+.game-shell:-webkit-full-screen {
+    width: 100vw;
+    height: 100vh;
+    max-width: 100vw;
+    max-height: 100vh;
+    aspect-ratio: auto;
+    border-radius: 0;
+    border: none;
+    box-shadow: none;
 }

@@ -1,6 +1,6 @@
 import { CONFIG } from './config.js';
 import { state } from './state.js';
-import { initInput, consumePause, consumeFullscreen } from './input.js';
+import { initInput, consumePause, consumeFullscreen, touch, getTouchButtons, isMobile } from './input.js';
 import {
     resetPlayer,
     updatePlayer,
@@ -335,6 +335,12 @@ function render() {
     }
 
     drawFlash();
+
+    // Touch-Controls zeichnen (nur auf Touch-Geraeten)
+    if (touch.active) {
+        drawTouchControls(ctx);
+    }
+
     ctx.restore();
 }
 
@@ -455,6 +461,134 @@ function drawHyperspaceEffect(ctx) {
         ctx.fillStyle = `rgba(255, 255, 255, ${flashAlpha})`;
         ctx.fillRect(0, 0, CONFIG.width, CONFIG.height);
     }
+
+    ctx.restore();
+}
+
+// ===================== TOUCH CONTROLS =====================
+function drawTouchControls(ctx) {
+    const { fireBtn, bombBtn, pauseBtn } = getTouchButtons();
+
+    ctx.save();
+
+    // === Virtueller Joystick ===
+    if (touch.joyActive) {
+        // Aussenring
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.35)';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(touch.joyOriginX, touch.joyOriginY, 90, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Knopf
+        const knobX = touch.joyOriginX + touch.joyX * 90;
+        const knobY = touch.joyOriginY + touch.joyY * 90;
+
+        const knobGradient = ctx.createRadialGradient(knobX, knobY, 0, knobX, knobY, 36);
+        knobGradient.addColorStop(0, 'rgba(56, 189, 248, 0.6)');
+        knobGradient.addColorStop(1, 'rgba(56, 189, 248, 0.15)');
+        ctx.fillStyle = knobGradient;
+        ctx.beginPath();
+        ctx.arc(knobX, knobY, 36, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.5)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+    } else {
+        // Inaktiver Joystick-Hinweis (links)
+        const hintX = 110;
+        const hintY = CONFIG.height - 110;
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.18)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(hintX, hintY, 70, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.fillStyle = 'rgba(56, 189, 248, 0.08)';
+        ctx.beginPath();
+        ctx.arc(hintX, hintY, 70, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Pfeil-Hinweis
+        ctx.fillStyle = 'rgba(56, 189, 248, 0.3)';
+        ctx.font = '700 28px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('+', hintX, hintY);
+    }
+
+    // === Feuer-Button ===
+    const fireGradient = ctx.createRadialGradient(fireBtn.x, fireBtn.y, 0, fireBtn.x, fireBtn.y, fireBtn.r);
+    if (touch.fire) {
+        fireGradient.addColorStop(0, 'rgba(249, 115, 22, 0.7)');
+        fireGradient.addColorStop(1, 'rgba(249, 115, 22, 0.25)');
+    } else {
+        fireGradient.addColorStop(0, 'rgba(249, 115, 22, 0.45)');
+        fireGradient.addColorStop(1, 'rgba(249, 115, 22, 0.1)');
+    }
+    ctx.fillStyle = fireGradient;
+    ctx.beginPath();
+    ctx.arc(fireBtn.x, fireBtn.y, fireBtn.r, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = touch.fire ? 'rgba(249, 115, 22, 0.8)' : 'rgba(249, 115, 22, 0.4)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(fireBtn.x, fireBtn.y, fireBtn.r, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.fillStyle = touch.fire ? '#fff' : 'rgba(249, 115, 22, 0.9)';
+    ctx.font = '900 24px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('FIRE', fireBtn.x, fireBtn.y);
+
+    // === Bomben-Button ===
+    const bombGradient = ctx.createRadialGradient(bombBtn.x, bombBtn.y, 0, bombBtn.x, bombBtn.y, bombBtn.r);
+    if (touch.bomb) {
+        bombGradient.addColorStop(0, 'rgba(239, 68, 68, 0.7)');
+        bombGradient.addColorStop(1, 'rgba(239, 68, 68, 0.25)');
+    } else {
+        bombGradient.addColorStop(0, 'rgba(239, 68, 68, 0.4)');
+        bombGradient.addColorStop(1, 'rgba(239, 68, 68, 0.1)');
+    }
+    ctx.fillStyle = bombGradient;
+    ctx.beginPath();
+    ctx.arc(bombBtn.x, bombBtn.y, bombBtn.r, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = touch.bomb ? 'rgba(239, 68, 68, 0.8)' : 'rgba(239, 68, 68, 0.4)';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.arc(bombBtn.x, bombBtn.y, bombBtn.r, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.fillStyle = touch.bomb ? '#fff' : 'rgba(239, 68, 68, 0.9)';
+    ctx.font = '900 18px Arial';
+    ctx.fillText('BOMB', bombBtn.x, bombBtn.y);
+
+    // Bomben-Anzahl neben dem Button
+    ctx.fillStyle = 'rgba(250, 204, 21, 0.8)';
+    ctx.font = '800 16px Arial';
+    ctx.fillText('x' + state.player.bombs, bombBtn.x, bombBtn.y + bombBtn.r + 18);
+
+    // === Pause-Button ===
+    ctx.fillStyle = 'rgba(148, 163, 184, 0.2)';
+    ctx.beginPath();
+    ctx.arc(pauseBtn.x, pauseBtn.y, pauseBtn.r, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = 'rgba(148, 163, 184, 0.4)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(pauseBtn.x, pauseBtn.y, pauseBtn.r, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Pause-Icon (zwei Balken)
+    ctx.fillStyle = 'rgba(148, 163, 184, 0.7)';
+    ctx.fillRect(pauseBtn.x - 7, pauseBtn.y - 8, 5, 16);
+    ctx.fillRect(pauseBtn.x + 2, pauseBtn.y - 8, 5, 16);
 
     ctx.restore();
 }
@@ -608,11 +742,13 @@ function drawHud() {
     ctx.font = '700 16px Arial';
     ctx.fillText(stage.name.toUpperCase(), CONFIG.width - 34, CONFIG.height - 40);
 
-    // FULLSCREEN HINT
-    ctx.textAlign = 'right';
-    ctx.fillStyle = 'rgba(148,163,184,.4)';
-    ctx.font = '700 12px Arial';
-    ctx.fillText('F = Fullscreen', CONFIG.width - 34, 20);
+    // FULLSCREEN HINT (nur Desktop)
+    if (!touch.active) {
+        ctx.textAlign = 'right';
+        ctx.fillStyle = 'rgba(148,163,184,.4)';
+        ctx.font = '700 12px Arial';
+        ctx.fillText('F = Fullscreen', CONFIG.width - 34, 20);
+    }
 
     ctx.restore();
 }
@@ -684,7 +820,7 @@ function drawPauseOverlay() {
     ctx.shadowColor = '#38bdf8';
     ctx.fillStyle = '#bae6fd';
     ctx.font = '800 22px Arial';
-    ctx.fillText('P druecken um fortzufahren', CONFIG.width / 2, CONFIG.height / 2 + 30);
+    ctx.fillText(touch.active ? 'Tap Pause um fortzufahren' : 'P druecken um fortzufahren', CONFIG.width / 2, CONFIG.height / 2 + 30);
 
     ctx.restore();
 }

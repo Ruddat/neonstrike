@@ -1,6 +1,6 @@
 import { CONFIG } from './config.js';
 import { state } from './state.js';
-import { keys, mouse } from './input.js';
+import { keys, mouse, touch } from './input.js';
 import { clamp } from './utils.js';
 import { assets } from './assets.js';
 import { updatePlayerPowerTimers } from './powerups.js';
@@ -30,7 +30,13 @@ export function updatePlayer(dt) {
     let dx = 0;
     let dy = 0;
 
-    if (mouse.inside) {
+    if (touch.joyActive) {
+        // Touch: Virtueller Joystick
+        dx = touch.joyX;
+        dy = touch.joyY;
+        player.x += dx * player.speed * dt;
+        player.y += dy * player.speed * dt;
+    } else if (mouse.inside) {
         const followSpeed = 12;
         player.x += (mouse.x - player.x) * Math.min(1, followSpeed * dt);
         player.y += (mouse.y - player.y) * Math.min(1, followSpeed * dt);
@@ -66,13 +72,15 @@ export function updatePlayer(dt) {
         player.thrustTimer = 0.03;
     }
 
-    if ((mouse.left || keys.has('Space') || keys.has('KeyJ')) && player.cooldown <= 0) {
+    // Feuern: Touch-Button ODER Maus/Keyboard
+    if ((touch.fire || mouse.left || keys.has('Space') || keys.has('KeyJ')) && player.cooldown <= 0) {
         fireBullet();
         player.cooldown = player.rapidTimer > 0 ? 0.055 : 0.12;
     }
 
+    // Bombe: Touch-Button ODER Maus/Keyboard
     if (
-        (mouse.right || keys.has('KeyK')) &&
+        (touch.bomb || mouse.right || keys.has('KeyK')) &&
         player.bombs > 0 &&
         player.bombCooldown <= 0
     ) {
