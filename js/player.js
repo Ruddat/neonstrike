@@ -57,6 +57,7 @@ export function updatePlayer(dt) {
     player.invulnerable -= dt;
     player.bombCooldown -= dt;
     player.thrustTimer -= dt;
+    if (player.shakeTimer > 0) player.shakeTimer -= dt;
     updatePlayerPowerTimers(dt);
 
     // Engine Thrust Particles
@@ -290,9 +291,16 @@ export function drawPlayer(ctx) {
     const player = state.player;
     const sprite = assets.get('player');
 
+    // Shake-Effekt waehrend Hyperspace
+    let shakeOffX = 0, shakeOffY = 0;
+    if (player.shakeTimer > 0) {
+        shakeOffX = (Math.random() - 0.5) * 8;
+        shakeOffY = (Math.random() - 0.5) * 8;
+    }
+
     if (sprite) {
         ctx.save();
-        ctx.translate(player.x, player.y);
+        ctx.translate(player.x + shakeOffX, player.y + shakeOffY);
 
         if (player.invulnerable > 0 && Math.floor(performance.now() / 90) % 2 === 0) {
             ctx.globalAlpha = 0.45;
@@ -331,7 +339,7 @@ export function drawPlayer(ctx) {
 
     // Fallback, falls Sprite fehlt
     ctx.save();
-    ctx.translate(player.x, player.y);
+    ctx.translate(player.x + shakeOffX, player.y + shakeOffY);
 
     if (player.invulnerable > 0 && Math.floor(performance.now() / 90) % 2 === 0) {
         ctx.globalAlpha = 0.45;

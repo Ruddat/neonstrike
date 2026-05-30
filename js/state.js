@@ -7,7 +7,7 @@ export const state = {
     wave: 1,
 
     killsThisStage: 0,
-    killsForBoss: 15,
+    killsForBoss: 25,
     boss: null,
     bossActive: false,
     bossWarning: false,
@@ -28,6 +28,11 @@ export const state = {
     // Stage Transition
     stageTransition: false,
     stageTransitionTimer: 0,
+
+    // Hyperspace Jump (nach Boss-Kill)
+    hyperspaceJump: false,
+    hyperspaceTimer: 0,
+    warpStars: [],
 
     // Formation System
     formationTimer: 0,
@@ -64,5 +69,6 @@ export const state = {
         // Bomb Fragment System: 3 Fragmente = 1 Bombe
         bombFragments: 0,
         maxBombFragments: 3,
+        shakeTimer: 0,
     },
 };

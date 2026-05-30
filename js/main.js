@@ -1,6 +1,6 @@
 import { CONFIG } from './config.js';
 import { state } from './state.js';
-import { initInput, pausePressed, fullscreenPressed } from './input.js';
+import { initInput, consumePause, consumeFullscreen } from './input.js';
 import {
     resetPlayer,
     updatePlayer,
@@ -124,9 +124,13 @@ function resetGame() {
     state.bossWarning = false;
     state.bossWarningTimer = 0;
     state.killsThisStage = 0;
+    state.killsForBoss = 25;
     state.stageIndex = 0;
     state.stageTransition = false;
     state.stageTransitionTimer = 0;
+    state.hyperspaceJump = false;
+    state.hyperspaceTimer = 0;
+    state.warpStars.length = 0;
     state.formationTimer = 0;
     state.formationWave = 0;
 
@@ -150,14 +154,12 @@ function resetGame() {
 
 function loop(time) {
     // Fullscreen-Toggle pruefen
-    if (fullscreenPressed) {
-        fullscreenPressed = false;
+    if (consumeFullscreen()) {
         toggleFullscreen();
     }
 
     // Pause-Toggle pruefen
-    if (pausePressed) {
-        pausePressed = false;
+    if (consumePause()) {
         if (state.running && !state.gameOver) {
             state.paused = !state.paused;
             if (!state.paused) {
@@ -196,11 +198,16 @@ function update(dt) {
     updateBackground(dt);
     updatePlayer(dt);
     updateBullets(dt);
-    updateEnemies(dt);
-    updateBoss(dt);
+
+    // Waehrend Hyperspace-Jump: keine Gegner/Boss/Kollisionen
+    if (!state.hyperspaceJump) {
+        updateEnemies(dt);
+        updateBoss(dt);
+        updateCollisions();
+    }
+
     updatePowerups(dt);
     updateEffects(dt);
-    updateCollisions();
 
     // Combo Timer
     if (state.comboTimer > 0) {
@@ -216,6 +223,24 @@ function update(dt) {
         state.stageTransitionTimer -= dt;
         if (state.stageTransitionTimer <= 0) {
             state.stageTransition = false;
+        }
+    }
+
+    // Hyperspace Jump
+    if (state.hyperspaceJump) {
+        state.hyperspaceTimer -= dt;
+        updateWarpStars(dt);
+        // Spieler wackelt beim Warp
+        state.player.shakeTimer = 0.05;
+        if (state.hyperspaceTimer <= 0) {
+            state.hyperspaceJump = false;
+            state.warpStars.length = 0;
+            state.stageIndex++;
+            // Boss braucht spaeter mehr Kills
+            state.killsForBoss = Math.min(45, state.killsForBoss + 3);
+            state.stageTransition = true;
+            state.stageTransitionTimer = 3.0;
+            backgroundDirty = true;
         }
     }
 
@@ -303,7 +328,134 @@ function render() {
     drawEffects(ctx);
     drawPowerups(ctx);
     drawPlayer(ctx);
+
+    // Hyperspace Warp Effect (ueber alles)
+    if (state.hyperspaceJump) {
+        drawHyperspaceEffect(ctx);
+    }
+
     drawFlash();
+    ctx.restore();
+}
+
+// ===================== HYPERSPACE WARP =====================
+function initWarpStars() {
+    state.warpStars = [];
+    for (let i = 0; i < 150; i++) {
+        state.warpStars.push({
+            angle: Math.random() * Math.PI * 2,
+            distance: Math.random() * 40,
+            speed: 180 + Math.random() * 500,
+            length: 0,
+            brightness: 0.3 + Math.random() * 0.7,
+            hue: Math.random() > 0.7 ? '#facc15' : Math.random() > 0.5 ? '#f97316' : '#38bdf8',
+        });
+    }
+}
+
+function updateWarpStars(dt) {
+    // Warp-Stars beim ersten Aufruf initialisieren
+    if (state.warpStars.length === 0) {
+        initWarpStars();
+    }
+
+    const progress = 1 - (state.hyperspaceTimer / 3.5);
+    const maxDist = Math.max(CONFIG.width, CONFIG.height) * 0.9;
+
+    for (const star of state.warpStars) {
+        star.distance += star.speed * dt * (1 + progress * 4);
+        star.length = 8 + star.distance * (0.2 + progress * 1.2);
+
+        if (star.distance > maxDist) {
+            star.distance = Math.random() * 20;
+            star.angle = Math.random() * Math.PI * 2;
+            star.speed = 180 + Math.random() * 500;
+        }
+    }
+}
+
+function drawHyperspaceEffect(ctx) {
+    const progress = 1 - (state.hyperspaceTimer / 3.5);
+    const cx = CONFIG.width / 2;
+    const cy = CONFIG.height / 2;
+
+    ctx.save();
+
+    // Dunkles Overlay mit Blau-Stich
+    const overlayAlpha = 0.3 + progress * 0.4;
+    ctx.fillStyle = `rgba(2, 6, 23, ${overlayAlpha})`;
+    ctx.fillRect(0, 0, CONFIG.width, CONFIG.height);
+
+    // Warp-Streaks (Sternenstreifen vom Zentrum nach aussen)
+    for (const star of state.warpStars) {
+        const x1 = cx + Math.cos(star.angle) * star.distance;
+        const y1 = cy + Math.sin(star.angle) * star.distance;
+        const x2 = cx + Math.cos(star.angle) * (star.distance + star.length);
+        const y2 = cy + Math.sin(star.angle) * (star.distance + star.length);
+
+        const alpha = star.brightness * Math.min(1, progress * 2.5);
+
+        ctx.strokeStyle = star.hue;
+        ctx.globalAlpha = alpha;
+        ctx.lineWidth = 1 + progress * 2.5;
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+
+    // Zentraler Glow
+    const glowR = 60 + progress * 250;
+    const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, glowR);
+    gradient.addColorStop(0, `rgba(56, 189, 248, ${0.4 * progress})`);
+    gradient.addColorStop(0.3, `rgba(56, 189, 248, ${0.15 * progress})`);
+    gradient.addColorStop(1, 'rgba(56, 189, 248, 0)');
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(cx, cy, glowR, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Rand-Vignette (Tunnel-Effekt)
+    const vignette = ctx.createRadialGradient(cx, cy, CONFIG.height * 0.2, cx, cy, CONFIG.height * 0.7);
+    vignette.addColorStop(0, 'rgba(0,0,0,0)');
+    vignette.addColorStop(1, `rgba(2, 6, 23, ${0.5 + progress * 0.4})`);
+    ctx.fillStyle = vignette;
+    ctx.fillRect(0, 0, CONFIG.width, CONFIG.height);
+
+    // HYPERSPACE Text
+    if (progress > 0.2 && progress < 0.88) {
+        const textIn = Math.min(1, (progress - 0.2) * 4);
+        const textOut = progress > 0.75 ? 1 - (progress - 0.75) / 0.13 : 1;
+        const textAlpha = Math.min(textIn, textOut);
+
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        ctx.shadowBlur = 36;
+        ctx.shadowColor = '#38bdf8';
+        ctx.fillStyle = `rgba(56, 189, 248, ${textAlpha})`;
+        ctx.font = '900 56px Arial';
+        ctx.fillText('HYPERSPACE', cx, cy - 35);
+
+        // Naechste Stage Info
+        const nextStage = getStage(state.stageIndex + 1);
+        ctx.shadowBlur = 18;
+        ctx.shadowColor = '#f97316';
+        ctx.fillStyle = `rgba(249, 115, 22, ${textAlpha * 0.9})`;
+        ctx.font = '800 26px Arial';
+        ctx.fillText('NEXT: STAGE ' + nextStage.id + ' — ' + nextStage.name.toUpperCase(), cx, cy + 25);
+
+        ctx.shadowBlur = 0;
+    }
+
+    // Weisser Flash am Ende des Warps
+    if (progress > 0.88) {
+        const flashAlpha = ((progress - 0.88) / 0.12) * 0.85;
+        ctx.fillStyle = `rgba(255, 255, 255, ${flashAlpha})`;
+        ctx.fillRect(0, 0, CONFIG.width, CONFIG.height);
+    }
+
     ctx.restore();
 }
 

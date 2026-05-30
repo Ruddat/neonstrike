@@ -406,11 +406,10 @@ function killBoss() {
     state.enemies.length = 0;
     state.killsThisStage = 0;
 
-    state.stageIndex++;
-
-    // Stage Transition starten
-    state.stageTransition = true;
-    state.stageTransitionTimer = 3.0;
+    // Hyperspace Jump zum naechsten Level starten
+    state.hyperspaceJump = true;
+    state.hyperspaceTimer = 3.5;
+    state.warpStars = [];
 
     state.screenFlash = 1;
     state.screenShake = 30;

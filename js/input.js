@@ -8,8 +8,24 @@ export const mouse = {
     inside: false,
 };
 
-export let pausePressed = false;
-export let fullscreenPressed = false;
+let pausePressed = false;
+let fullscreenPressed = false;
+
+export function consumePause() {
+    if (pausePressed) {
+        pausePressed = false;
+        return true;
+    }
+    return false;
+}
+
+export function consumeFullscreen() {
+    if (fullscreenPressed) {
+        fullscreenPressed = false;
+        return true;
+    }
+    return false;
+}
 
 export function initInput(canvas) {
     window.addEventListener('keydown', (event) => {
@@ -21,10 +37,12 @@ export function initInput(canvas) {
 
         if (event.code === 'KeyP') {
             pausePressed = true;
+            event.preventDefault();
         }
 
         if (event.code === 'KeyF') {
             fullscreenPressed = true;
+            event.preventDefault();
         }
     });
 
