@@ -1,6 +1,7 @@
 import { CONFIG } from './config.js';
 import { state } from './state.js';
 import { assets } from './assets.js';
+import { getStage } from './stages.js';
 
 let spawnTimer = 0;
 
@@ -28,11 +29,14 @@ export function updateEnemies(dt) {
         enemy.fireTimer -= dt;
 
         if (enemy.fireTimer <= 0 && enemy.x < CONFIG.width - 90) {
-            state.enemyBullets.push({
+            const stage = getStage(state.stageIndex);
+    const bulletSpeedMul = stage.enemySpeed || 1;
+
+    state.enemyBullets.push({
                 x: enemy.x - 32,
                 y: enemy.y,
-                vx: -310,
-                vy: Math.sin(enemy.t * 2) * 70,
+                vx: -310 * bulletSpeedMul,
+                vy: Math.sin(enemy.t * 2) * 70 * bulletSpeedMul,
                 r: 5,
             });
 
@@ -50,6 +54,8 @@ export function updateEnemies(dt) {
 function spawnEnemy() {
     const type = Math.random() > 0.72 ? 'heavy' : 'drone';
     const y = 70 + Math.random() * (CONFIG.height - 140);
+    const stage = getStage(state.stageIndex);
+    const speedMul = stage.enemySpeed || 1;
 
     const enemy = {
         type,
@@ -58,9 +64,9 @@ function spawnEnemy() {
         baseY: y,
         w: type === 'heavy' ? 76 : 52,
         h: type === 'heavy' ? 44 : 30,
-        speed: type === 'heavy' ? 125 : 190 + Math.random() * 55,
-        hp: type === 'heavy' ? 5 : 2,
-        points: type === 'heavy' ? 360 : 150,
+        speed: (type === 'heavy' ? 125 : 190 + Math.random() * 55) * speedMul,
+        hp: type === 'heavy' ? 5 + Math.floor(state.stageIndex * 0.8) : 2 + Math.floor(state.stageIndex * 0.4),
+        points: type === 'heavy' ? 360 + state.stageIndex * 40 : 150 + state.stageIndex * 15,
         wave: type === 'heavy' ? 18 : 34,
         t: Math.random() * 10,
         fireTimer: type === 'heavy' ? 1.3 : 2.0,
@@ -72,6 +78,23 @@ function spawnEnemy() {
 function updateEnemyBullets(dt) {
     for (let i = state.enemyBullets.length - 1; i >= 0; i--) {
         const bullet = state.enemyBullets[i];
+
+        // Homing-Verfolgung
+        if (bullet.homing && bullet.homingTimer > 0) {
+            bullet.homingTimer -= dt;
+            const dx = state.player.x - bullet.x;
+            const dy = state.player.y - bullet.y;
+            const len = Math.hypot(dx, dy) || 1;
+            const turnRate = 200;
+            bullet.vx += (dx / len) * turnRate * dt;
+            bullet.vy += (dy / len) * turnRate * dt;
+            const speed = Math.hypot(bullet.vx, bullet.vy);
+            const maxSpeed = 400;
+            if (speed > maxSpeed) {
+                bullet.vx = (bullet.vx / speed) * maxSpeed;
+                bullet.vy = (bullet.vy / speed) * maxSpeed;
+            }
+        }
 
         bullet.x += bullet.vx * dt;
         bullet.y += bullet.vy * dt;
@@ -139,14 +162,24 @@ export function drawEnemies(ctx) {
 
 export function drawEnemyBullets(ctx) {
     for (const bullet of state.enemyBullets) {
-        ctx.shadowBlur = 16;
-        ctx.shadowColor = '#22c55e';
-        ctx.fillStyle = '#86efac';
+        ctx.save();
+
+        if (bullet.homing) {
+            // Zielsuchende Geschosse: Rot mit Staerkere Glow
+            ctx.shadowBlur = 22;
+            ctx.shadowColor = '#ef4444';
+            ctx.fillStyle = '#fca5a5';
+        } else {
+            ctx.shadowBlur = 16;
+            ctx.shadowColor = '#22c55e';
+            ctx.fillStyle = '#86efac';
+        }
 
         ctx.beginPath();
         ctx.arc(bullet.x, bullet.y, bullet.r, 0, Math.PI * 2);
         ctx.fill();
 
         ctx.shadowBlur = 0;
+        ctx.restore();
     }
 }

@@ -8,12 +8,18 @@ export const mouse = {
     inside: false,
 };
 
+export let pausePressed = false;
+
 export function initInput(canvas) {
     window.addEventListener('keydown', (event) => {
         keys.add(event.code);
 
         if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(event.code)) {
             event.preventDefault();
+        }
+
+        if (event.code === 'KeyP') {
+            pausePressed = true;
         }
     });
 

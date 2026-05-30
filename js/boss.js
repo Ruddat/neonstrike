@@ -74,54 +74,152 @@ function spawnBoss() {
 }
 
 function fireBossPattern(boss) {
-    if (boss.phase === 1) {
-        for (let i = -2; i <= 2; i++) {
-            state.enemyBullets.push({
-                x: boss.x - 120,
-                y: boss.y + i * 24,
-                vx: -340,
-                vy: i * 32,
-                r: 7,
-            });
-        }
+    // Zufaellige Mustervariation fuer mehr Abwechslung
+    const patternVariant = Math.floor(boss.t * 3) % 3;
 
-        boss.fireTimer = 1.15;
+    if (boss.phase === 1) {
+        if (patternVariant === 0) {
+            // Standard: Facher-Schuss
+            for (let i = -2; i <= 2; i++) {
+                state.enemyBullets.push({
+                    x: boss.x - 120,
+                    y: boss.y + i * 24,
+                    vx: -340,
+                    vy: i * 32,
+                    r: 7,
+                });
+            }
+            boss.fireTimer = 1.15;
+        } else if (patternVariant === 1) {
+            // Gezielter Schuss Richtung Spieler
+            const dx = state.player.x - (boss.x - 120);
+            const dy = state.player.y - boss.y;
+            const len = Math.hypot(dx, dy) || 1;
+            for (let i = -1; i <= 1; i++) {
+                state.enemyBullets.push({
+                    x: boss.x - 120,
+                    y: boss.y + i * 30,
+                    vx: (dx / len) * 360,
+                    vy: (dy / len) * 360 + i * 45,
+                    r: 6,
+                });
+            }
+            boss.fireTimer = 1.3;
+        } else {
+            // Doppelreihe
+            for (let i = -3; i <= 3; i++) {
+                state.enemyBullets.push({
+                    x: boss.x - 120 + (i % 2 === 0 ? 0 : 40),
+                    y: boss.y + i * 20,
+                    vx: -300,
+                    vy: i * 25,
+                    r: 5,
+                });
+            }
+            boss.fireTimer = 1.0;
+        }
         return;
     }
 
     if (boss.phase === 2) {
-        for (let i = 0; i < 14; i++) {
-            const angle = (Math.PI * 2 / 14) * i;
-
-            state.enemyBullets.push({
-                x: boss.x - 110,
-                y: boss.y,
-                vx: Math.cos(angle) * 230 - 160,
-                vy: Math.sin(angle) * 230,
-                r: 7,
-            });
+        if (patternVariant === 0) {
+            // Ring-Schuss (original)
+            for (let i = 0; i < 14; i++) {
+                const angle = (Math.PI * 2 / 14) * i;
+                state.enemyBullets.push({
+                    x: boss.x - 110,
+                    y: boss.y,
+                    vx: Math.cos(angle) * 230 - 160,
+                    vy: Math.sin(angle) * 230,
+                    r: 7,
+                });
+            }
+            state.screenFlash = 0.35;
+            state.screenShake = 8;
+            boss.fireTimer = 1.65;
+        } else {
+            // Spirale
+            const baseAngle = boss.t * 3;
+            for (let i = 0; i < 8; i++) {
+                const angle = baseAngle + (Math.PI * 2 / 8) * i;
+                state.enemyBullets.push({
+                    x: boss.x - 110,
+                    y: boss.y,
+                    vx: Math.cos(angle) * 260,
+                    vy: Math.sin(angle) * 260,
+                    r: 6,
+                });
+            }
+            state.screenFlash = 0.25;
+            boss.fireTimer = 0.7;
         }
-
-        state.screenFlash = 0.35;
-        state.screenShake = 8;
-        boss.fireTimer = 1.65;
         return;
     }
 
     if (boss.phase === 3) {
-        for (let i = -6; i <= 6; i++) {
-            state.enemyBullets.push({
-                x: boss.x - 120,
-                y: boss.y,
-                vx: -430,
-                vy: i * 42,
-                r: 8,
-            });
+        if (patternVariant === 0) {
+            // Breite Salve (original)
+            for (let i = -6; i <= 6; i++) {
+                state.enemyBullets.push({
+                    x: boss.x - 120,
+                    y: boss.y,
+                    vx: -430,
+                    vy: i * 42,
+                    r: 8,
+                });
+            }
+            state.screenFlash = 0.5;
+            state.screenShake = 14;
+            boss.fireTimer = 0.85;
+        } else if (patternVariant === 1) {
+            // Zielverfolgende Geschosse + Facher
+            const dx = state.player.x - (boss.x - 120);
+            const dy = state.player.y - boss.y;
+            const len = Math.hypot(dx, dy) || 1;
+            // 3 zielsuchende
+            for (let i = -1; i <= 1; i++) {
+                state.enemyBullets.push({
+                    x: boss.x - 120,
+                    y: boss.y + i * 40,
+                    vx: (dx / len) * 380,
+                    vy: (dy / len) * 380 + i * 30,
+                    r: 9,
+                    homing: true,
+                    homingTimer: 0.8,
+                });
+            }
+            // + Facher
+            for (let i = -3; i <= 3; i++) {
+                state.enemyBullets.push({
+                    x: boss.x - 100,
+                    y: boss.y + i * 30,
+                    vx: -360,
+                    vy: i * 55,
+                    r: 6,
+                });
+            }
+            state.screenFlash = 0.4;
+            state.screenShake = 12;
+            boss.fireTimer = 1.1;
+        } else {
+            // Doppel-Ring rotiert
+            for (let ring = 0; ring < 2; ring++) {
+                const offset = ring * (Math.PI / 10);
+                for (let i = 0; i < 10; i++) {
+                    const angle = (Math.PI * 2 / 10) * i + offset + boss.t;
+                    state.enemyBullets.push({
+                        x: boss.x - 110,
+                        y: boss.y,
+                        vx: Math.cos(angle) * (250 + ring * 50),
+                        vy: Math.sin(angle) * (250 + ring * 50),
+                        r: 6,
+                    });
+                }
+            }
+            state.screenFlash = 0.3;
+            state.screenShake = 10;
+            boss.fireTimer = 1.3;
         }
-
-        state.screenFlash = 0.5;
-        state.screenShake = 14;
-        boss.fireTimer = 0.85;
     }
 }
 

@@ -1,6 +1,6 @@
 import { CONFIG } from './config.js';
 import { state } from './state.js';
-import { initInput } from './input.js';
+import { initInput, pausePressed } from './input.js';
 import {
     resetPlayer,
     updatePlayer,
@@ -58,7 +58,6 @@ import {
 
 let introActive = true;
 
-const newRecord = saveHighscoreIfNeeded();
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const overlay = document.getElementById('overlay');
@@ -93,18 +92,32 @@ function resetGame() {
 }
 
 function loop(time) {
-    if (state.paused) return;
+    // Pause-Toggle pruefen
+    if (pausePressed) {
+        pausePressed = false;
+        if (state.running && !state.gameOver) {
+            state.paused = !state.paused;
+            if (!state.paused) {
+                state.lastTime = time;
+            }
+        }
+    }
 
     const dt = Math.min((time - state.lastTime) / 1000, 0.033);
     state.lastTime = time;
 
-    if (state.running) {
+    if (state.running && !state.paused) {
         update(dt);
     }
 
     render();
 
-    if (state.running) {
+    // Pause-Overlay zeichnen
+    if (state.paused) {
+        drawPauseOverlay();
+    }
+
+    if (state.running || state.paused) {
         requestAnimationFrame(loop);
     }
 
@@ -225,25 +238,61 @@ function drawHud() {
         drawBombIcon(ctx, 48 + i * 30, 224);
     }
 
-    // POWER BAR
+    // POWER BAR (dynamisch - zeigt Waffen-Dauer)
     ctx.fillStyle = '#38bdf8';
     ctx.fillText('POWER', 34, CONFIG.height - 96);
 
     const maxBars = 10;
-    const activeBars = player.weaponType === 'laser' ? 4 : 8;
+    let activeBars;
+    const maxDuration = player.weaponType === 'spread' ? 16
+        : player.weaponType === 'plasma' ? 12
+        : player.weaponType === 'railgun' ? 8
+        : 14;
+    if (player.weaponType === 'laser') {
+        activeBars = maxBars; // Standard-Waffe = volle Leiste
+    } else {
+        // Dauer-Balken proportional zur Max-Dauer
+        activeBars = Math.ceil((player.weaponTimer / maxDuration) * maxBars);
+    }
 
     for (let i = 0; i < maxBars; i++) {
-        ctx.fillStyle = i < activeBars ? '#22c55e' : 'rgba(148,163,184,.28)';
+        const isActive = i < activeBars;
+        if (isActive && player.weaponType !== 'laser' && activeBars <= 3) {
+            ctx.fillStyle = '#ef4444'; // Rot wenn fast abgelaufen
+        } else if (isActive) {
+            ctx.fillStyle = player.weaponType === 'laser' ? '#22c55e' : '#facc15';
+        } else {
+            ctx.fillStyle = 'rgba(148,163,184,.28)';
+        }
         ctx.fillRect(34 + i * 18, CONFIG.height - 72, 14, 18);
     }
 
     ctx.strokeStyle = 'rgba(186,230,253,.45)';
     ctx.strokeRect(34, CONFIG.height - 72, maxBars * 18 - 4, 18);
 
-    // WEAPON
+    // WEAPON + Timer
     ctx.fillStyle = '#38bdf8';
     ctx.font = '800 18px Arial';
-    ctx.fillText('WEAPON: ' + String(player.weaponType || 'laser').toUpperCase(), 34, CONFIG.height - 28);
+    let weaponText = 'WEAPON: ' + String(player.weaponType || 'laser').toUpperCase();
+    if (player.weaponType !== 'laser' && player.weaponTimer > 0) {
+        weaponText += '  ' + player.weaponTimer.toFixed(1) + 's';
+    }
+    ctx.fillText(weaponText, 34, CONFIG.height - 28);
+
+    // SHIELD TIMER
+    if (player.shieldTimer > 0) {
+        ctx.fillStyle = '#22c55e';
+        ctx.font = '800 18px Arial';
+        ctx.fillText('SHIELD: ' + player.shieldTimer.toFixed(1) + 's', 34, CONFIG.height - 48);
+    }
+
+    // RAPID FIRE TIMER
+    if (player.rapidTimer > 0) {
+        ctx.fillStyle = '#facc15';
+        ctx.font = '800 18px Arial';
+        const rapidX = player.shieldTimer > 0 ? 260 : 34;
+        ctx.fillText('RAPID: ' + player.rapidTimer.toFixed(1) + 's', rapidX, CONFIG.height - 48);
+    }
 
     // STAGE
     ctx.textAlign = 'right';
@@ -306,16 +355,38 @@ function drawBombIcon(ctx, x, y) {
     ctx.restore();
 }
 
-function showGameOver() {
-const newRecord = saveHighscoreIfNeeded();
+function drawPauseOverlay() {
+    ctx.save();
 
-overlay.querySelector('.eyebrow').textContent = newRecord ? 'New Highscore' : 'Game Over';
-overlay.querySelector('h1').textContent = String(state.score).padStart(7, '0');
-overlay.querySelector('.subtitle').textContent = newRecord
-    ? 'Neuer Rekord gespeichert. Drücke Start Game für einen neuen Versuch.'
-    : 'Drücke Start Game für einen neuen Versuch.';
-    const stage = getStage(state.stageIndex);
-    overlay.querySelector('.subtitle').textContent = 'Drücke Start Game für einen neuen Versuch.';
+    ctx.fillStyle = 'rgba(2, 6, 23, 0.65)';
+    ctx.fillRect(0, 0, CONFIG.width, CONFIG.height);
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    ctx.shadowBlur = 28;
+    ctx.shadowColor = '#f97316';
+    ctx.fillStyle = '#f97316';
+    ctx.font = '900 64px Arial';
+    ctx.fillText('PAUSE', CONFIG.width / 2, CONFIG.height / 2 - 30);
+
+    ctx.shadowBlur = 12;
+    ctx.shadowColor = '#38bdf8';
+    ctx.fillStyle = '#bae6fd';
+    ctx.font = '800 22px Arial';
+    ctx.fillText('P druecken um fortzufahren', CONFIG.width / 2, CONFIG.height / 2 + 30);
+
+    ctx.restore();
+}
+
+function showGameOver() {
+    const newRecord = saveHighscoreIfNeeded();
+
+    overlay.querySelector('.eyebrow').textContent = newRecord ? 'New Highscore' : 'Game Over';
+    overlay.querySelector('h1').textContent = String(state.score).padStart(7, '0');
+    overlay.querySelector('.subtitle').textContent = newRecord
+        ? 'Neuer Rekord gespeichert! Drücke Restart für einen neuen Versuch.'
+        : 'Drücke Restart für einen neuen Versuch.';
     startButton.textContent = 'Restart';
     overlay.classList.remove('is-hidden');
 

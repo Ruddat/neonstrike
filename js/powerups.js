@@ -51,30 +51,30 @@ export function applyPowerup(type) {
 
     if (type === 'spread') {
         player.weaponType = 'spread';
-        player.weaponTimer = 14;
+        player.weaponTimer = 16; // Laenger da schwaecher
     }
 
     if (type === 'plasma') {
         player.weaponType = 'plasma';
-        player.weaponTimer = 14;
+        player.weaponTimer = 12; // Mittel
     }
 
     if (type === 'rapid') {
-        player.rapidTimer = 12;
+        player.rapidTimer = 10;
     }
 
     if (type === 'life') {
-    player.lives = Math.min(player.lives + 1, 5);
-}
+        player.lives = Math.min(player.lives + 1, 5);
+    }
 
     if (type === 'shield') {
-        player.shieldTimer = 10;
+        player.shieldTimer = 8;
         player.invulnerable = Math.max(player.invulnerable, 1);
     }
 
     if (type === 'railgun') {
         player.weaponType = 'railgun';
-        player.weaponTimer = 14;
+        player.weaponTimer = 8; // Kuerzer da staerkste Waffe
     }
 }
 
