@@ -6,6 +6,7 @@ import {
     updatePlayer,
     updateBullets,
     drawPlayer,
+    drawBullets,
 } from './player.js';
 
 import {
