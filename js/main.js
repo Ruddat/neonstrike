@@ -1,6 +1,6 @@
 import { CONFIG } from './config.js';
 import { state } from './state.js';
-import { initInput, pausePressed } from './input.js';
+import { initInput, pausePressed, fullscreenPressed } from './input.js';
 import {
     resetPlayer,
     updatePlayer,
@@ -62,6 +62,49 @@ const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const overlay = document.getElementById('overlay');
 const startButton = document.getElementById('startButton');
+const fsButton = document.getElementById('fullscreenBtn');
+
+// ===================== FULLSCREEN =====================
+export function toggleFullscreen() {
+    const shell = document.querySelector('.game-shell');
+    if (!document.fullscreenElement) {
+        shell.requestFullscreen().catch(() => {});
+    } else {
+        document.exitFullscreen().catch(() => {});
+    }
+}
+
+// Fullscreen-Change Styling
+document.addEventListener('fullscreenchange', () => {
+    const shell = document.querySelector('.game-shell');
+    if (document.fullscreenElement) {
+        shell.style.width = '100vw';
+        shell.style.height = '100vh';
+        shell.style.borderRadius = '0';
+        shell.style.border = 'none';
+    } else {
+        shell.style.width = '';
+        shell.style.height = '';
+        shell.style.borderRadius = '';
+        shell.style.border = '';
+    }
+});
+
+if (fsButton) {
+    fsButton.addEventListener('click', toggleFullscreen);
+}
+
+// ===================== BOMB FRAGMENT REWARD =====================
+export function addBombFragment() {
+    const player = state.player;
+    player.bombFragments++;
+    if (player.bombFragments >= player.maxBombFragments) {
+        player.bombFragments = 0;
+        player.bombs = Math.min(player.bombs + 1, player.maxBombs);
+        // Feedback wenn neue Bombe fertig
+        state.screenFlash = Math.max(state.screenFlash, 0.2);
+    }
+}
 
 function resetGame() {
     audio.playIngame();
@@ -106,6 +149,12 @@ function resetGame() {
 }
 
 function loop(time) {
+    // Fullscreen-Toggle pruefen
+    if (fullscreenPressed) {
+        fullscreenPressed = false;
+        toggleFullscreen();
+    }
+
     // Pause-Toggle pruefen
     if (pausePressed) {
         pausePressed = false;
@@ -216,7 +265,7 @@ function render() {
 
     ctx.translate(shakeX, shakeY);
 
-    // Background: Cache statische Elemente, nur Sterne dynamisch
+    // Background: Multi-Layer Parallax
     drawBackground(ctx);
 
     // Stage Transition Overlay
@@ -320,13 +369,28 @@ function drawHud() {
         drawMiniShip(ctx, 48 + i * 34, 145);
     }
 
-    // BOMBS
+    // BOMBS + Fragment Bar
     ctx.fillStyle = '#38bdf8';
     ctx.font = '800 24px Arial';
     ctx.fillText('BOMBS', 34, 196);
 
     for (let i = 0; i < player.bombs; i++) {
         drawBombIcon(ctx, 48 + i * 30, 224);
+    }
+
+    // Bomb Fragment Fortschritt
+    if (player.bombFragments > 0) {
+        const fragX = 48 + player.bombs * 30 + 8;
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '800 14px Arial';
+        ctx.fillText('NEXT:', fragX, 218);
+
+        // Fragment-Balken
+        for (let i = 0; i < player.maxBombFragments; i++) {
+            const filled = i < player.bombFragments;
+            ctx.fillStyle = filled ? '#f97316' : 'rgba(148,163,184,.25)';
+            ctx.fillRect(fragX + i * 16, 224, 12, 12);
+        }
     }
 
     // WEAPON LEVEL BAR (Katakis-Style)
@@ -391,6 +455,12 @@ function drawHud() {
     ctx.fillStyle = 'rgba(248,250,252,.82)';
     ctx.font = '700 16px Arial';
     ctx.fillText(stage.name.toUpperCase(), CONFIG.width - 34, CONFIG.height - 40);
+
+    // FULLSCREEN HINT
+    ctx.textAlign = 'right';
+    ctx.fillStyle = 'rgba(148,163,184,.4)';
+    ctx.font = '700 12px Arial';
+    ctx.fillText('F = Fullscreen', CONFIG.width - 34, 20);
 
     ctx.restore();
 }

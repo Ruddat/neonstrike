@@ -3,6 +3,7 @@ import { clamp } from './utils.js';
 import { maybeDropPowerup } from './powerups.js';
 import { damageBoss, startBossWarning } from './boss.js';
 import { spawnExplosion, spawnHitSpark, spawnComboText } from './effects.js';
+import { addBombFragment } from './main.js';
 
 export function updateCollisions() {
     handlePlayerBulletsVsEnemies();
@@ -57,6 +58,12 @@ function handlePlayerBulletsVsEnemies() {
                         state.comboMultiplier = 2;
                     } else {
                         state.comboMultiplier = 1;
+                    }
+
+                    // Combo Bomb Reward: Bei jedem Multiplier-Sprung = Bomb-Fragment
+                    if (state.comboCount === 5 || state.comboCount === 10 ||
+                        state.comboCount === 15 || state.comboCount === 20) {
+                        addBombFragment();
                     }
 
                     // Max Combo tracken

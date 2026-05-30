@@ -12,6 +12,7 @@ export function resetPlayer() {
     state.player.y = CONFIG.height / 2;
     state.player.lives = 3;
     state.player.bombs = 3;
+    state.player.bombFragments = 0;
     state.player.cooldown = 0;
     state.player.bombCooldown = 0;
     state.player.invulnerable = 1.2;

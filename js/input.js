@@ -9,6 +9,7 @@ export const mouse = {
 };
 
 export let pausePressed = false;
+export let fullscreenPressed = false;
 
 export function initInput(canvas) {
     window.addEventListener('keydown', (event) => {
@@ -20,6 +21,10 @@ export function initInput(canvas) {
 
         if (event.code === 'KeyP') {
             pausePressed = true;
+        }
+
+        if (event.code === 'KeyF') {
+            fullscreenPressed = true;
         }
     });
 

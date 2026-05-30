@@ -433,6 +433,9 @@ function killBoss() {
         t: 0,
     });
 
+    // Garantierte Bombe nach Boss-Kill!
+    state.player.bombs = Math.min(state.player.bombs + 1, state.player.maxBombs);
+
     audio.playIngame();
 }
 

@@ -4,13 +4,13 @@ import { clamp } from './utils.js';
 import { audio } from './audio.js';
 
 
-const TYPES = ['spread', 'plasma', 'rapid', 'shield', 'life', 'railgun', 'weaponUp'];
+const TYPES = ['spread', 'plasma', 'rapid', 'shield', 'life', 'railgun', 'weaponUp', 'bomb'];
 
 export function maybeDropPowerup(x, y) {
     // Hoehere Drop-Rate fuer mehr Katakis-Feeling
     if (Math.random() > 0.28) return;
 
-    // weaponUp hat hoechste Prioritaet, danach Waffen, dann Utility
+    // Gewichtete Drop-Tabelle
     const weights = {
         weaponUp: state.player.weaponLevel < state.player.maxWeaponLevel ? 3 : 0,
         spread: 2,
@@ -19,6 +19,7 @@ export function maybeDropPowerup(x, y) {
         rapid: 2,
         shield: 2,
         life: 1,
+        bomb: 2,
     };
 
     const pool = [];
@@ -116,6 +117,16 @@ export function applyPowerup(type) {
         if (player.weaponLevel < 2) player.weaponLevel = 2;
     }
 
+    // Bomb Fragment: Sammle 3 = 1 neue Bombe
+    if (type === 'bomb') {
+        player.bombFragments++;
+        if (player.bombFragments >= player.maxBombFragments) {
+            player.bombFragments = 0;
+            player.bombs = Math.min(player.bombs + 1, player.maxBombs);
+            state.screenFlash = Math.max(state.screenFlash, 0.25);
+        }
+    }
+
     // Powerup-Sammel-Feedback
     state.screenFlash = Math.max(state.screenFlash, 0.12);
 }
@@ -191,6 +202,7 @@ function getPowerupColor(type) {
     if (type === 'life') return '#ef4444';
     if (type === 'railgun') return '#f43f5e';
     if (type === 'weaponUp') return '#f97316';
+    if (type === 'bomb') return '#fb923c';
     return '#ffffff';
 }
 
@@ -202,5 +214,6 @@ function getPowerupLabel(type) {
     if (type === 'life') return '+';
     if (type === 'railgun') return 'G';
     if (type === 'weaponUp') return 'UP';
+    if (type === 'bomb') return 'B';
     return '?';
 }

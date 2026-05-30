@@ -2,18 +2,53 @@ import { CONFIG } from './config.js';
 import { state } from './state.js';
 import { getStage } from './stages.js';
 
-const stars = Array.from({ length: 170 }, () => ({
+// ============================================================
+// MULTI-LAYER PARALLAX BACKGROUND
+// 3 Sternen-Layer (deep, mid, near) + Nebel-Wolken + Objekte
+// ============================================================
+
+// Layer 1: Deep Stars (am langsamsten, am kleinsten)
+const deepStars = Array.from({ length: 100 }, () => ({
     x: Math.random() * CONFIG.width,
     y: Math.random() * CONFIG.height,
-    z: Math.random() * 3 + 1,
-    r: Math.random() * 1.8 + 0.25,
+    r: Math.random() * 0.8 + 0.2,
+    brightness: Math.random() * 0.3 + 0.1,
 }));
 
+// Layer 2: Mid Stars (mittlere Geschwindigkeit)
+const midStars = Array.from({ length: 90 }, () => ({
+    x: Math.random() * CONFIG.width,
+    y: Math.random() * CONFIG.height,
+    r: Math.random() * 1.2 + 0.3,
+    z: Math.random() * 1.5 + 1,
+    brightness: Math.random() * 0.3 + 0.2,
+}));
+
+// Layer 3: Near Stars (am schnellsten, am groessten)
+const nearStars = Array.from({ length: 50 }, () => ({
+    x: Math.random() * CONFIG.width,
+    y: Math.random() * CONFIG.height,
+    r: Math.random() * 2.0 + 0.5,
+    z: Math.random() * 1.5 + 2.5,
+    brightness: Math.random() * 0.3 + 0.3,
+}));
+
+// Nebel-Wolken Layer (sehr langsam, gross, semi-transparent)
+const nebulaClouds = Array.from({ length: 6 }, (_, i) => ({
+    x: Math.random() * CONFIG.width,
+    y: 60 + Math.random() * (CONFIG.height - 120),
+    w: 200 + Math.random() * 350,
+    h: 100 + Math.random() * 180,
+    speed: 5 + Math.random() * 12,
+    hue: i % 3, // 0=blue, 1=purple, 2=cyan
+}));
+
+// Parallax Foreground Objects
 const parallaxObjects = Array.from({ length: 18 }, (_, i) => ({
     x: Math.random() * CONFIG.width,
     y: 80 + Math.random() * (CONFIG.height - 160),
     size: 30 + Math.random() * 90,
-    speed: 18 + Math.random() * 42,
+    speed: 22 + Math.random() * 50,
     layer: i % 3,
 }));
 
@@ -52,18 +87,47 @@ function renderBgCache(stage) {
 }
 
 export function updateBackground(dt) {
-    for (const star of stars) {
-        star.x -= star.z * 70 * dt;
-
-        if (star.x < -10) {
-            star.x = CONFIG.width + Math.random() * 80;
+    // Deep Stars: sehr langsam
+    for (const star of deepStars) {
+        star.x -= 15 * dt;
+        if (star.x < -5) {
+            star.x = CONFIG.width + Math.random() * 40;
             star.y = Math.random() * CONFIG.height;
         }
     }
 
+    // Mid Stars: mittlere Geschwindigkeit
+    for (const star of midStars) {
+        star.x -= star.z * 50 * dt;
+        if (star.x < -10) {
+            star.x = CONFIG.width + Math.random() * 60;
+            star.y = Math.random() * CONFIG.height;
+        }
+    }
+
+    // Near Stars: schnell
+    for (const star of nearStars) {
+        star.x -= star.z * 90 * dt;
+        if (star.x < -15) {
+            star.x = CONFIG.width + Math.random() * 100;
+            star.y = Math.random() * CONFIG.height;
+        }
+    }
+
+    // Nebel-Wolken: sehr langsam scrollen
+    for (const cloud of nebulaClouds) {
+        cloud.x -= cloud.speed * dt;
+        if (cloud.x < -cloud.w - 50) {
+            cloud.x = CONFIG.width + Math.random() * 200;
+            cloud.y = 60 + Math.random() * (CONFIG.height - 120);
+            cloud.w = 200 + Math.random() * 350;
+            cloud.h = 100 + Math.random() * 180;
+        }
+    }
+
+    // Parallax Foreground Objects
     for (const obj of parallaxObjects) {
         obj.x -= obj.speed * dt;
-
         if (obj.x < -obj.size - 80) {
             obj.x = CONFIG.width + Math.random() * 300;
             obj.y = 80 + Math.random() * (CONFIG.height - 160);
@@ -84,21 +148,98 @@ export function drawBackground(ctx) {
     ensureBgCache();
     ctx.drawImage(bgCacheCanvas, 0, 0);
 
-    // Dynamische Elemente: Sterne
-    drawStars(ctx, stage);
+    // === PARALLAX LAYERS (von hinten nach vorne) ===
 
-    // Dynamische Elemente: Parallax Objekte
+    // Layer 0: Nebel-Wolken (am weitesten hinten, sehr subtil)
+    drawNebulaClouds(ctx, stage);
+
+    // Layer 1: Deep Stars (weit entfernt)
+    drawDeepStars(ctx, stage);
+
+    // Layer 2: Mid Stars
+    drawMidStars(ctx, stage);
+
+    // Layer 3: Near Stars (nah, hell, schnell)
+    drawNearStars(ctx, stage);
+
+    // Layer 4: Parallax Objects (am naechsten)
     drawParallaxObjects(ctx, stage);
 }
 
-function drawStars(ctx, stage) {
-    for (const star of stars) {
-        ctx.globalAlpha = 0.25 + star.z * 0.18;
-        ctx.fillStyle = stage.colors.accent || '#bae6fd';
-        ctx.fillRect(star.x, star.y, star.r * star.z, star.r);
+function drawDeepStars(ctx, stage) {
+    const accent = stage.colors.accent || '#bae6fd';
+    for (const star of deepStars) {
+        ctx.globalAlpha = star.brightness;
+        ctx.fillStyle = accent;
+        ctx.fillRect(star.x, star.y, star.r, star.r);
     }
-
     ctx.globalAlpha = 1;
+}
+
+function drawMidStars(ctx, stage) {
+    const accent = stage.colors.accent || '#bae6fd';
+    for (const star of midStars) {
+        ctx.globalAlpha = star.brightness + 0.08;
+        ctx.fillStyle = star.z > 2 ? '#ffffff' : accent;
+        ctx.fillRect(star.x, star.y, star.r * star.z * 0.5, star.r);
+    }
+    ctx.globalAlpha = 1;
+}
+
+function drawNearStars(ctx, stage) {
+    const accent = stage.colors.accent || '#bae6fd';
+    for (const star of nearStars) {
+        ctx.globalAlpha = star.brightness + 0.15;
+
+        // Nahe Sterne haben einen leichten Glow
+        ctx.fillStyle = star.z > 3.5 ? '#ffffff' : accent;
+        ctx.fillRect(star.x, star.y, star.r * star.z * 0.4, star.r);
+
+        // Kleines Kreuz-Muster fuer die hellsten Sterne
+        if (star.r > 1.5 && star.z > 3) {
+            ctx.globalAlpha = star.brightness * 0.5;
+            ctx.fillRect(star.x - star.r * 2, star.y, star.r * 4, 0.5);
+            ctx.fillRect(star.x, star.y - star.r * 2, 0.5, star.r * 4);
+        }
+    }
+    ctx.globalAlpha = 1;
+}
+
+function drawNebulaClouds(ctx, stage) {
+    for (const cloud of nebulaClouds) {
+        ctx.save();
+        ctx.globalAlpha = 0.06;
+
+        const colors = ['#38bdf8', '#a855f7', '#818cf8'];
+        const baseColor = colors[cloud.hue];
+
+        const g = ctx.createRadialGradient(
+            cloud.x + cloud.w / 2,
+            cloud.y + cloud.h / 2,
+            10,
+            cloud.x + cloud.w / 2,
+            cloud.y + cloud.h / 2,
+            Math.max(cloud.w, cloud.h) * 0.6
+        );
+        g.addColorStop(0, baseColor + '44');
+        g.addColorStop(0.5, baseColor + '18');
+        g.addColorStop(1, 'rgba(0,0,0,0)');
+
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.ellipse(
+            cloud.x + cloud.w / 2,
+            cloud.y + cloud.h / 2,
+            cloud.w / 2,
+            cloud.h / 2,
+            0,
+            0,
+            Math.PI * 2
+        );
+        ctx.fill();
+
+        ctx.restore();
+    }
 }
 
 function drawStageDecoration(ctx, stage) {

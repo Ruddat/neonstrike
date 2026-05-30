@@ -34,6 +34,7 @@ body {
         0 0 0 1px rgba(255, 255, 255, .04),
         0 28px 90px rgba(0, 0, 0, .65),
         0 0 80px rgba(14, 165, 233, .16);
+    transition: border-radius .3s ease, border .3s ease;
 }
 
 canvas {
@@ -118,4 +119,33 @@ button {
     color: rgba(226, 246, 255, .58);
     font-size: 13px;
     pointer-events: none;
+}
+
+/* Fullscreen Button */
+.fs-btn {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 10;
+    width: 36px;
+    height: 36px;
+    border: 1px solid rgba(56, 189, 248, .4);
+    border-radius: 8px;
+    background: rgba(2, 6, 23, .7);
+    color: #38bdf8;
+    font-size: 18px;
+    line-height: 1;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background .2s, border-color .2s;
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+.fs-btn:hover {
+    background: rgba(56, 189, 248, .2);
+    border-color: #38bdf8;
 }

@@ -48,6 +48,7 @@ export const state = {
         cooldown: 0,
         lives: 3,
         bombs: 3,
+        maxBombs: 5,
         bombCooldown: 0,
         invulnerable: 0,
         weaponType: 'laser',
@@ -59,5 +60,9 @@ export const state = {
         weaponLevel: 1,       // 1-5, steigert Feuerkraft
         maxWeaponLevel: 5,
         thrustTimer: 0,       // fuer Engine-Flammen
+
+        // Bomb Fragment System: 3 Fragmente = 1 Bombe
+        bombFragments: 0,
+        maxBombFragments: 3,
     },
 };
