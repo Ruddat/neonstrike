@@ -6,7 +6,6 @@ import {
     updatePlayer,
     updateBullets,
     drawPlayer,
-    drawBullets,
 } from './player.js';
 
 import {
@@ -74,6 +73,7 @@ function resetGame() {
     state.enemies.length = 0;
     state.powerups.length = 0;
     state.gameOver = false;
+    state.gameOverShown = false;
 
     state.boss = null;
     state.bossActive = false;
@@ -81,9 +81,22 @@ function resetGame() {
     state.bossWarningTimer = 0;
     state.killsThisStage = 0;
     state.stageIndex = 0;
+    state.stageTransition = false;
+    state.stageTransitionTimer = 0;
+    state.formationTimer = 0;
+    state.formationWave = 0;
+
+    // Combo Reset
+    state.comboCount = 0;
+    state.comboTimer = 0;
+    state.comboMultiplier = 1;
+    state.maxCombo = 0;
 
     resetPlayer();
     resetEnemies();
+
+    // Background Cache invalidieren
+    backgroundDirty = true;
 
     overlay.classList.add('is-hidden');
     state.lastTime = performance.now();
@@ -99,6 +112,7 @@ function loop(time) {
             state.paused = !state.paused;
             if (!state.paused) {
                 state.lastTime = time;
+                backgroundDirty = true;
             }
         }
     }
@@ -121,7 +135,9 @@ function loop(time) {
         requestAnimationFrame(loop);
     }
 
-    if (state.gameOver) {
+    // Game-Over nur EINMAL anzeigen
+    if (state.gameOver && !state.gameOverShown) {
+        state.gameOverShown = true;
         showGameOver();
     }
 }
@@ -136,6 +152,23 @@ function update(dt) {
     updateEffects(dt);
     updateCollisions();
 
+    // Combo Timer
+    if (state.comboTimer > 0) {
+        state.comboTimer -= dt;
+        if (state.comboTimer <= 0) {
+            state.comboCount = 0;
+            state.comboMultiplier = 1;
+        }
+    }
+
+    // Stage Transition
+    if (state.stageTransition) {
+        state.stageTransitionTimer -= dt;
+        if (state.stageTransitionTimer <= 0) {
+            state.stageTransition = false;
+        }
+    }
+
     if (state.screenFlash > 0) {
         state.screenFlash -= dt * 1.8;
     }
@@ -143,8 +176,6 @@ function update(dt) {
     if (state.screenShake > 0) {
         state.screenShake -= dt * 28;
     }
-
-
 }
 
 
@@ -161,8 +192,22 @@ function introLoop(time) {
     requestAnimationFrame(introLoop);
 }
 
-function render() {
+// --- Background Cache (Offscreen Canvas) ---
+let bgCanvas = null;
+let bgCtx = null;
+let bgStageIndex = -1;
+let backgroundDirty = true;
 
+function ensureBgCanvas() {
+    if (!bgCanvas) {
+        bgCanvas = document.createElement('canvas');
+        bgCanvas.width = CONFIG.width;
+        bgCanvas.height = CONFIG.height;
+        bgCtx = bgCanvas.getContext('2d');
+    }
+}
+
+function render() {
     ctx.save();
 
     const shakeX = (Math.random() - 0.5) * state.screenShake;
@@ -170,9 +215,37 @@ function render() {
 
     ctx.translate(shakeX, shakeY);
 
-
+    // Background: Cache statische Elemente, nur Sterne dynamisch
     drawBackground(ctx);
+
+    // Stage Transition Overlay
+    if (state.stageTransition) {
+        const alpha = Math.min(1, state.stageTransitionTimer * 0.8);
+        ctx.fillStyle = `rgba(2, 6, 23, ${alpha})`;
+        ctx.fillRect(0, 0, CONFIG.width, CONFIG.height);
+
+        if (state.stageTransitionTimer > 1.5) {
+            const stage = getStage(state.stageIndex);
+            ctx.save();
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.shadowBlur = 36;
+            ctx.shadowColor = '#f97316';
+            ctx.fillStyle = '#f97316';
+            ctx.font = '900 64px Arial';
+            ctx.fillText('STAGE ' + stage.id, CONFIG.width / 2, CONFIG.height / 2 - 30);
+
+            ctx.shadowBlur = 18;
+            ctx.shadowColor = '#38bdf8';
+            ctx.fillStyle = '#bae6fd';
+            ctx.font = '800 28px Arial';
+            ctx.fillText(stage.name.toUpperCase(), CONFIG.width / 2, CONFIG.height / 2 + 30);
+            ctx.restore();
+        }
+    }
+
     drawHud();
+    drawBossHud(ctx);
     drawBullets(ctx);
     drawEnemyBullets(ctx);
     drawEnemies(ctx);
@@ -182,7 +255,6 @@ function render() {
     drawPlayer(ctx);
     drawFlash();
     ctx.restore();
-
 }
 
 function drawFlash() {
@@ -196,7 +268,6 @@ function drawFlash() {
 
     ctx.restore();
 }
-
 
 
 function drawHud() {
@@ -222,8 +293,26 @@ function drawHud() {
     ctx.fillStyle = '#f8fafc';
     ctx.fillText(String(state.highscore || 0).padStart(7, '0'), CONFIG.width - 210, 76);
 
+    // COMBO (Katakis-Style)
+    if (state.comboCount >= 3) {
+        ctx.save();
+        const pulse = Math.sin(performance.now() * 0.008) * 0.3 + 0.7;
+        ctx.shadowBlur = 22 * pulse;
+        ctx.shadowColor = '#facc15';
+        ctx.fillStyle = '#facc15';
+        ctx.font = '900 32px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('x' + state.comboMultiplier + ' COMBO!', CONFIG.width / 2, 50);
+        ctx.fillStyle = '#fef3c7';
+        ctx.font = '800 18px Arial';
+        ctx.fillText(state.comboCount + ' KILLS', CONFIG.width / 2, 76);
+        ctx.restore();
+    }
+
     // LIVES
     ctx.fillStyle = '#38bdf8';
+    ctx.font = '800 24px Arial';
+    ctx.textAlign = 'left';
     ctx.fillText('LIVES', 34, 118);
 
     for (let i = 0; i < player.lives; i++) {
@@ -232,58 +321,56 @@ function drawHud() {
 
     // BOMBS
     ctx.fillStyle = '#38bdf8';
+    ctx.font = '800 24px Arial';
     ctx.fillText('BOMBS', 34, 196);
 
     for (let i = 0; i < player.bombs; i++) {
         drawBombIcon(ctx, 48 + i * 30, 224);
     }
 
-    // POWER BAR (dynamisch - zeigt Waffen-Dauer)
+    // WEAPON LEVEL BAR (Katakis-Style)
     ctx.fillStyle = '#38bdf8';
-    ctx.fillText('POWER', 34, CONFIG.height - 96);
+    ctx.font = '800 18px Arial';
+    const weaponLabel = String(player.weaponType || 'laser').toUpperCase();
+    ctx.fillText('WPN: ' + weaponLabel + ' LV.' + player.weaponLevel, 34, CONFIG.height - 96);
 
-    const maxBars = 10;
-    let activeBars;
-    const maxDuration = player.weaponType === 'spread' ? 16
-        : player.weaponType === 'plasma' ? 12
-        : player.weaponType === 'railgun' ? 8
-        : 14;
-    if (player.weaponType === 'laser') {
-        activeBars = maxBars; // Standard-Waffe = volle Leiste
-    } else {
-        // Dauer-Balken proportional zur Max-Dauer
-        activeBars = Math.ceil((player.weaponTimer / maxDuration) * maxBars);
-    }
-
+    // Level-Balken
+    const maxBars = player.maxWeaponLevel;
+    const activeBars = player.weaponLevel;
     for (let i = 0; i < maxBars; i++) {
         const isActive = i < activeBars;
-        if (isActive && player.weaponType !== 'laser' && activeBars <= 3) {
-            ctx.fillStyle = '#ef4444'; // Rot wenn fast abgelaufen
-        } else if (isActive) {
-            ctx.fillStyle = player.weaponType === 'laser' ? '#22c55e' : '#facc15';
+        if (isActive) {
+            const levelColor = player.weaponLevel >= 4 ? '#ef4444'
+                : player.weaponLevel >= 3 ? '#f97316'
+                : '#22c55e';
+            ctx.fillStyle = levelColor;
         } else {
             ctx.fillStyle = 'rgba(148,163,184,.28)';
         }
-        ctx.fillRect(34 + i * 18, CONFIG.height - 72, 14, 18);
+        ctx.fillRect(34 + i * 36, CONFIG.height - 72, 30, 18);
     }
 
-    ctx.strokeStyle = 'rgba(186,230,253,.45)';
-    ctx.strokeRect(34, CONFIG.height - 72, maxBars * 18 - 4, 18);
-
-    // WEAPON + Timer
-    ctx.fillStyle = '#38bdf8';
-    ctx.font = '800 18px Arial';
-    let weaponText = 'WEAPON: ' + String(player.weaponType || 'laser').toUpperCase();
+    // Weapon Timer Balken
     if (player.weaponType !== 'laser' && player.weaponTimer > 0) {
-        weaponText += '  ' + player.weaponTimer.toFixed(1) + 's';
+        const maxDuration = player.weaponType === 'spread' ? 16
+            : player.weaponType === 'plasma' ? 12
+            : player.weaponType === 'railgun' ? 8
+            : 14;
+        const pct = player.weaponTimer / maxDuration;
+        const barW = maxBars * 36 - 6;
+
+        ctx.fillStyle = 'rgba(0,0,0,.4)';
+        ctx.fillRect(34, CONFIG.height - 48, barW, 8);
+
+        ctx.fillStyle = pct < 0.25 ? '#ef4444' : '#facc15';
+        ctx.fillRect(34, CONFIG.height - 48, barW * pct, 8);
     }
-    ctx.fillText(weaponText, 34, CONFIG.height - 28);
 
     // SHIELD TIMER
     if (player.shieldTimer > 0) {
         ctx.fillStyle = '#22c55e';
         ctx.font = '800 18px Arial';
-        ctx.fillText('SHIELD: ' + player.shieldTimer.toFixed(1) + 's', 34, CONFIG.height - 48);
+        ctx.fillText('SHIELD: ' + player.shieldTimer.toFixed(1) + 's', 34, CONFIG.height - 28);
     }
 
     // RAPID FIRE TIMER
@@ -291,7 +378,7 @@ function drawHud() {
         ctx.fillStyle = '#facc15';
         ctx.font = '800 18px Arial';
         const rapidX = player.shieldTimer > 0 ? 260 : 34;
-        ctx.fillText('RAPID: ' + player.rapidTimer.toFixed(1) + 's', rapidX, CONFIG.height - 48);
+        ctx.fillText('RAPID: ' + player.rapidTimer.toFixed(1) + 's', rapidX, CONFIG.height - 28);
     }
 
     // STAGE
@@ -382,18 +469,22 @@ function drawPauseOverlay() {
 function showGameOver() {
     const newRecord = saveHighscoreIfNeeded();
 
-    overlay.querySelector('.eyebrow').textContent = newRecord ? 'New Highscore' : 'Game Over';
+    overlay.querySelector('.eyebrow').textContent = newRecord ? 'New Highscore!' : 'Game Over';
     overlay.querySelector('h1').textContent = String(state.score).padStart(7, '0');
-    overlay.querySelector('.subtitle').textContent = newRecord
-        ? 'Neuer Rekord gespeichert! Drücke Restart für einen neuen Versuch.'
-        : 'Drücke Restart für einen neuen Versuch.';
+
+    let subtitle = '';
+    if (newRecord) {
+        subtitle = 'NEUER REKORD! ';
+    }
+    subtitle += 'Max Combo: x' + state.maxCombo + ' · Druecke Restart';
+    overlay.querySelector('.subtitle').textContent = subtitle;
+
     startButton.textContent = 'Restart';
     overlay.classList.remove('is-hidden');
 
     audio.stopIngame();
     audio.playMenu();
 }
-
 
 
 async function boot() {

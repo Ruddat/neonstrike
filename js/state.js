@@ -2,6 +2,7 @@ export const state = {
     running: false,
     paused: false,
     gameOver: false,
+    gameOverShown: false,
     stageIndex: 0,
     wave: 1,
 
@@ -17,6 +18,20 @@ export const state = {
     screenFlash: 0,
     screenShake: 0,
     highscore: Number(localStorage.getItem('neonStrikeHighscore') || 0),
+
+    // Combo-System (Katakis-Style)
+    comboCount: 0,
+    comboTimer: 0,
+    comboMultiplier: 1,
+    maxCombo: 0,
+
+    // Stage Transition
+    stageTransition: false,
+    stageTransitionTimer: 0,
+
+    // Formation System
+    formationTimer: 0,
+    formationWave: 0,
 
     bullets: [],
     particles: [],
@@ -39,5 +54,10 @@ export const state = {
         weaponTimer: 0,
         rapidTimer: 0,
         shieldTimer: 0,
+
+        // Katakis Weapon Level System
+        weaponLevel: 1,       // 1-5, steigert Feuerkraft
+        maxWeaponLevel: 5,
+        thrustTimer: 0,       // fuer Engine-Flammen
     },
 };

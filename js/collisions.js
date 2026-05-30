@@ -2,7 +2,7 @@ import { state } from './state.js';
 import { clamp } from './utils.js';
 import { maybeDropPowerup } from './powerups.js';
 import { damageBoss, startBossWarning } from './boss.js';
-import { spawnExplosion } from './effects.js';
+import { spawnExplosion, spawnHitSpark, spawnComboText } from './effects.js';
 
 export function updateCollisions() {
     handlePlayerBulletsVsEnemies();
@@ -11,7 +11,8 @@ export function updateCollisions() {
 }
 
 function handlePlayerBulletsVsEnemies() {
-        handlePlayerBulletsVsBoss();
+    handlePlayerBulletsVsBoss();
+
     for (let i = state.enemies.length - 1; i >= 0; i--) {
         const enemy = state.enemies[i];
 
@@ -29,25 +30,59 @@ function handlePlayerBulletsVsEnemies() {
                     enemy.h
                 )
             ) {
-if (bullet.pierce && bullet.pierce > 0) {
-    bullet.pierce--;
-} else {
-    state.bullets.splice(j, 1);
-}
+                // Hit Spark
+                spawnHitSpark(bullet.x, bullet.y);
+
+                if (bullet.pierce && bullet.pierce > 0) {
+                    bullet.pierce--;
+                } else {
+                    state.bullets.splice(j, 1);
+                }
+
                 enemy.hp -= bullet.damage;
 
-if (enemy.hp <= 0) {
-    state.score += enemy.points;
-    state.killsThisStage++;
-    maybeDropPowerup(enemy.x, enemy.y);
-    spawnExplosion(enemy.x, enemy.y, enemy.type === 'heavy' ? 1.4 : 1);
+                if (enemy.hp <= 0) {
+                    // Combo System
+                    state.comboCount++;
+                    state.comboTimer = 2.0; // 2 Sekunden Window
 
-    if (state.killsThisStage >= state.killsForBoss) {
-        startBossWarning();
-    }
+                    // Multiplier berechnen
+                    if (state.comboCount >= 20) {
+                        state.comboMultiplier = 5;
+                    } else if (state.comboCount >= 15) {
+                        state.comboMultiplier = 4;
+                    } else if (state.comboCount >= 10) {
+                        state.comboMultiplier = 3;
+                    } else if (state.comboCount >= 5) {
+                        state.comboMultiplier = 2;
+                    } else {
+                        state.comboMultiplier = 1;
+                    }
 
-    state.enemies.splice(i, 1);
-}
+                    // Max Combo tracken
+                    if (state.comboCount > state.maxCombo) {
+                        state.maxCombo = state.comboCount;
+                    }
+
+                    // Score mit Multiplier
+                    const points = enemy.points * state.comboMultiplier;
+                    state.score += points;
+                    state.killsThisStage++;
+
+                    // Combo Text anzeigen
+                    if (state.comboCount >= 3) {
+                        spawnComboText(enemy.x, enemy.y - 30, state.comboCount, state.comboMultiplier);
+                    }
+
+                    maybeDropPowerup(enemy.x, enemy.y);
+                    spawnExplosion(enemy.x, enemy.y, enemy.type === 'heavy' ? 1.4 : 1);
+
+                    if (state.killsThisStage >= state.killsForBoss && !state.bossActive) {
+                        startBossWarning();
+                    }
+
+                    state.enemies.splice(i, 1);
+                }
 
                 break;
             }
@@ -75,6 +110,12 @@ function handleEnemiesVsPlayer() {
                 enemy.h
             )
         ) {
+            // Kamikaze explodiert beim Kontakt
+            if (enemy.type === 'kamikaze') {
+                spawnExplosion(enemy.x, enemy.y, 1.6);
+            } else {
+                spawnExplosion(enemy.x, enemy.y, 0.8);
+            }
             state.enemies.splice(i, 1);
             damagePlayer();
             break;
@@ -127,7 +168,11 @@ function handlePlayerBulletsVsBoss() {
                 boss.h
             )
         ) {
-            state.bullets.splice(j, 1);
+            if (bullet.pierce && bullet.pierce > 0) {
+                bullet.pierce--;
+            } else {
+                state.bullets.splice(j, 1);
+            }
             damageBoss(bullet.damage);
         }
     }
@@ -135,6 +180,11 @@ function handlePlayerBulletsVsBoss() {
 
 
 function damagePlayer() {
+    // Combo wird bei Treffer zurueckgesetzt
+    state.comboCount = 0;
+    state.comboMultiplier = 1;
+    state.comboTimer = 0;
+
     if (state.player.shieldTimer > 0) {
         state.player.shieldTimer = 0;
         state.player.invulnerable = 1.2;
@@ -143,8 +193,14 @@ function damagePlayer() {
         return;
     }
 
+    // Waffen-Level verliert 1 Stufe bei Tod (Katakis-Style)
     state.player.lives--;
     state.player.invulnerable = 1.5;
+
+    // Weapon Downgrade bei Tod
+    if (state.player.weaponLevel > 1) {
+        state.player.weaponLevel--;
+    }
 
     if (state.player.lives <= 0) {
         state.player.lives = 0;

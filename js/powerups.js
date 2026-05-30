@@ -4,18 +4,36 @@ import { clamp } from './utils.js';
 import { audio } from './audio.js';
 
 
-const TYPES = ['spread', 'plasma', 'rapid', 'shield', 'life', 'railgun'];
+const TYPES = ['spread', 'plasma', 'rapid', 'shield', 'life', 'railgun', 'weaponUp'];
 
 export function maybeDropPowerup(x, y) {
-    if (Math.random() > 0.22) return;
+    // Hoehere Drop-Rate fuer mehr Katakis-Feeling
+    if (Math.random() > 0.28) return;
 
-    const type = TYPES[Math.floor(Math.random() * TYPES.length)];
+    // weaponUp hat hoechste Prioritaet, danach Waffen, dann Utility
+    const weights = {
+        weaponUp: state.player.weaponLevel < state.player.maxWeaponLevel ? 3 : 0,
+        spread: 2,
+        plasma: 2,
+        railgun: 1,
+        rapid: 2,
+        shield: 2,
+        life: 1,
+    };
+
+    const pool = [];
+    for (const type of TYPES) {
+        const w = weights[type] || 1;
+        for (let i = 0; i < w; i++) pool.push(type);
+    }
+
+    const type = pool[Math.floor(Math.random() * pool.length)];
 
     state.powerups.push({
         x,
         y,
         type,
-        speed: 120,
+        speed: 100,
         r: 18,
         t: 0,
     });
@@ -38,7 +56,15 @@ export function updatePowerups(dt) {
         const dx = p.x - player.x;
         const dy = p.y - player.y;
 
-        if (Math.hypot(dx, dy) < p.r + 34) {
+        // Magnet-Effekt: Powerups werden angezogen wenn nah
+        const dist = Math.hypot(dx, dy);
+        if (dist < 120) {
+            const pull = (1 - dist / 120) * 320;
+            p.x -= (dx / dist) * pull * dt;
+            p.y -= (dy / dist) * pull * dt;
+        }
+
+        if (dist < p.r + 34) {
             applyPowerup(p.type);
             state.powerups.splice(i, 1);
         }
@@ -49,14 +75,26 @@ export function applyPowerup(type) {
     const player = state.player;
     audio.playSfx('powerup');
 
+    // Waffen-Upgrades: Weapon Level erhoehen
+    if (type === 'weaponUp') {
+        if (player.weaponLevel < player.maxWeaponLevel) {
+            player.weaponLevel++;
+            state.screenFlash = Math.max(state.screenFlash, 0.25);
+        }
+        return;
+    }
+
+    // Waffen-Pickups: Wechsel + Level beibehalten oder +1
     if (type === 'spread') {
         player.weaponType = 'spread';
-        player.weaponTimer = 16; // Laenger da schwaecher
+        player.weaponTimer = 16;
+        if (player.weaponLevel < 2) player.weaponLevel = 2;
     }
 
     if (type === 'plasma') {
         player.weaponType = 'plasma';
-        player.weaponTimer = 12; // Mittel
+        player.weaponTimer = 12;
+        if (player.weaponLevel < 2) player.weaponLevel = 2;
     }
 
     if (type === 'rapid') {
@@ -74,8 +112,12 @@ export function applyPowerup(type) {
 
     if (type === 'railgun') {
         player.weaponType = 'railgun';
-        player.weaponTimer = 8; // Kuerzer da staerkste Waffe
+        player.weaponTimer = 8;
+        if (player.weaponLevel < 2) player.weaponLevel = 2;
     }
+
+    // Powerup-Sammel-Feedback
+    state.screenFlash = Math.max(state.screenFlash, 0.12);
 }
 
 export function updatePlayerPowerTimers(dt) {
@@ -87,6 +129,7 @@ export function updatePlayerPowerTimers(dt) {
 
     if (player.weaponTimer <= 0) {
         player.weaponType = 'laser';
+        // Level NICHT zuruecksetzen bei Waffenwechsel - Katakis behaelt Upgrades!
     }
 
     player.weaponTimer = clamp(player.weaponTimer, 0, 99);
@@ -97,28 +140,44 @@ export function updatePlayerPowerTimers(dt) {
 export function drawPowerups(ctx) {
     for (const p of state.powerups) {
         const color = getPowerupColor(p.type);
+        const label = getPowerupLabel(p.type);
 
         ctx.save();
         ctx.translate(p.x, p.y);
+
+        // Aeussere Pulsation
+        const pulse = Math.sin(p.t * 5) * 0.15 + 1;
+        ctx.scale(pulse, pulse);
+
         ctx.rotate(p.t * 2.4);
 
-        ctx.shadowBlur = 18;
+        ctx.shadowBlur = 20;
         ctx.shadowColor = color;
 
+        // Aussenring
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(0, 0, 20, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Inneres Diamond
         ctx.fillStyle = color;
         ctx.beginPath();
-        ctx.moveTo(0, -16);
-        ctx.lineTo(15, 0);
-        ctx.lineTo(0, 16);
-        ctx.lineTo(-15, 0);
+        ctx.moveTo(0, -14);
+        ctx.lineTo(13, 0);
+        ctx.lineTo(0, 14);
+        ctx.lineTo(-13, 0);
         ctx.closePath();
         ctx.fill();
 
+        // Label
         ctx.fillStyle = '#020617';
-        ctx.font = '900 13px Arial';
+        ctx.font = '900 11px Arial';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(getPowerupLabel(p.type), 0, 1);
+        ctx.shadowBlur = 0;
+        ctx.fillText(label, 0, 1);
 
         ctx.restore();
     }
@@ -131,6 +190,7 @@ function getPowerupColor(type) {
     if (type === 'shield') return '#22c55e';
     if (type === 'life') return '#ef4444';
     if (type === 'railgun') return '#f43f5e';
+    if (type === 'weaponUp') return '#f97316';
     return '#ffffff';
 }
 
@@ -141,5 +201,6 @@ function getPowerupLabel(type) {
     if (type === 'shield') return 'D';
     if (type === 'life') return '+';
     if (type === 'railgun') return 'G';
+    if (type === 'weaponUp') return 'UP';
     return '?';
 }

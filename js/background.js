@@ -17,6 +17,39 @@ const parallaxObjects = Array.from({ length: 18 }, (_, i) => ({
     layer: i % 3,
 }));
 
+// --- Offscreen-Canvas Cache fuer statische Hintergruende ---
+let bgCacheCanvas = null;
+let bgCacheCtx = null;
+let bgCacheStageIndex = -1;
+
+function ensureBgCache() {
+    if (!bgCacheCanvas) {
+        bgCacheCanvas = document.createElement('canvas');
+        bgCacheCanvas.width = CONFIG.width;
+        bgCacheCanvas.height = CONFIG.height;
+        bgCacheCtx = bgCacheCanvas.getContext('2d');
+    }
+}
+
+function renderBgCache(stage) {
+    ensureBgCache();
+    bgCacheStageIndex = state.stageIndex;
+
+    const ctx = bgCacheCtx;
+    ctx.clearRect(0, 0, CONFIG.width, CONFIG.height);
+
+    // Gradient
+    const gradient = ctx.createLinearGradient(0, 0, CONFIG.width, CONFIG.height);
+    gradient.addColorStop(0, stage.colors.top);
+    gradient.addColorStop(0.5, stage.colors.mid);
+    gradient.addColorStop(1, stage.colors.bottom);
+
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, CONFIG.width, CONFIG.height);
+
+    // Stage Decoration (statisch)
+    drawStageDecoration(ctx, stage);
+}
 
 export function updateBackground(dt) {
     for (const star of stars) {
@@ -28,32 +61,34 @@ export function updateBackground(dt) {
         }
     }
 
-for (const obj of parallaxObjects) {
-    obj.x -= obj.speed * dt;
+    for (const obj of parallaxObjects) {
+        obj.x -= obj.speed * dt;
 
-    if (obj.x < -obj.size - 80) {
-        obj.x = CONFIG.width + Math.random() * 300;
-        obj.y = 80 + Math.random() * (CONFIG.height - 160);
-        obj.size = 30 + Math.random() * 90;
+        if (obj.x < -obj.size - 80) {
+            obj.x = CONFIG.width + Math.random() * 300;
+            obj.y = 80 + Math.random() * (CONFIG.height - 160);
+            obj.size = 30 + Math.random() * 90;
+        }
     }
-}
-
 }
 
 export function drawBackground(ctx) {
     const stage = getStage(state.stageIndex);
 
-    const gradient = ctx.createLinearGradient(0, 0, CONFIG.width, CONFIG.height);
-    gradient.addColorStop(0, stage.colors.top);
-    gradient.addColorStop(0.5, stage.colors.mid);
-    gradient.addColorStop(1, stage.colors.bottom);
+    // Cache invalidieren wenn Stage sich aendert
+    if (bgCacheStageIndex !== state.stageIndex) {
+        renderBgCache(stage);
+    }
 
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, CONFIG.width, CONFIG.height);
+    // Statischen Hintergrund aus Cache zeichnen
+    ensureBgCache();
+    ctx.drawImage(bgCacheCanvas, 0, 0);
 
+    // Dynamische Elemente: Sterne
     drawStars(ctx, stage);
+
+    // Dynamische Elemente: Parallax Objekte
     drawParallaxObjects(ctx, stage);
-    drawStageDecoration(ctx, stage);
 }
 
 function drawStars(ctx, stage) {
@@ -267,4 +302,3 @@ function drawSpaceDustObject(ctx, obj, stage) {
     ctx.arc(obj.x, obj.y, obj.size * 0.18, 0, Math.PI * 2);
     ctx.fill();
 }
-
