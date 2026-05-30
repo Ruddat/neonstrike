@@ -66,10 +66,10 @@ export function updatePlayer(dt) {
     if (player.shakeTimer > 0) player.shakeTimer -= dt;
     updatePlayerPowerTimers(dt);
 
-    // Engine Thrust Particles
+    // Engine Thrust Particles (reduziert fuer Performance)
     if (player.thrustTimer <= 0) {
         spawnThrustParticle(player.x - 40, player.y);
-        player.thrustTimer = 0.03;
+        player.thrustTimer = 0.06;
     }
 
     // Feuern: Touch-Button ODER Maus/Keyboard
@@ -316,29 +316,35 @@ export function drawPlayer(ctx) {
 
         ctx.drawImage(sprite, -64, -32, 128, 64);
 
-        // Shield visual
+        // Shield visual (ohne shadowBlur)
         if (player.shieldTimer > 0) {
             const shieldPulse = Math.sin(performance.now() * 0.006) * 0.3 + 0.7;
+            // Glow via halb-transparenter Kreis
+            ctx.fillStyle = 'rgba(34, 197, 94, 0.1)';
+            ctx.beginPath();
+            ctx.arc(0, 0, 52, 0, Math.PI * 2);
+            ctx.fill();
+
             ctx.strokeStyle = '#22c55e';
             ctx.lineWidth = 2 + shieldPulse;
-            ctx.shadowBlur = 14;
-            ctx.shadowColor = '#22c55e';
             ctx.beginPath();
             ctx.arc(0, 0, 48, 0, Math.PI * 2);
             ctx.stroke();
-            ctx.shadowBlur = 0;
         }
 
-        // Weapon Level Glow
+        // Weapon Level Glow (ohne shadowBlur)
         if (player.weaponLevel >= 3) {
-            const glowColor = player.weaponLevel >= 5 ? '#ef4444' : '#f97316';
-            ctx.shadowBlur = 12;
-            ctx.shadowColor = glowColor;
-            ctx.fillStyle = glowColor + '33';
+            const glowColor = player.weaponLevel >= 5 ? 'rgba(239, 68, 68, 0.2)' : 'rgba(249, 115, 22, 0.2)';
+            ctx.fillStyle = glowColor;
+            ctx.beginPath();
+            ctx.arc(24, 0, 26, 0, Math.PI * 2);
+            ctx.fill();
+
+            const coreColor = player.weaponLevel >= 5 ? '#ef4444' : '#f97316';
+            ctx.fillStyle = coreColor + '33';
             ctx.beginPath();
             ctx.arc(24, 0, 22, 0, Math.PI * 2);
             ctx.fill();
-            ctx.shadowBlur = 0;
         }
 
         ctx.restore();
@@ -374,51 +380,49 @@ export function drawBullets(ctx) {
     for (const bullet of state.bullets) {
 
         if (bullet.rail) {
-            ctx.save();
-            ctx.shadowBlur = 28;
-            ctx.shadowColor = '#38bdf8';
+            // Railgun: Glow via breites semi-transparentes Rechteck
+            ctx.fillStyle = 'rgba(56, 189, 248, 0.25)';
+            ctx.fillRect(bullet.x - 24, bullet.y - 9, 110, 18);
+
             ctx.fillStyle = '#e0f2fe';
             ctx.fillRect(bullet.x - 12, bullet.y - 5, 80, 10);
 
             ctx.fillStyle = '#38bdf8';
             ctx.fillRect(bullet.x - 24, bullet.y - 2, 110, 4);
-            ctx.restore();
             continue;
         }
 
         if (bullet.plasma) {
-            ctx.save();
-            ctx.shadowBlur = 22;
-            ctx.shadowColor = '#a855f7';
+            // Plasma: Glow via groesserer Kreis dahinter
+            ctx.fillStyle = 'rgba(168, 85, 247, 0.2)';
+            ctx.beginPath();
+            ctx.arc(bullet.x, bullet.y, bullet.r * 1.5, 0, Math.PI * 2);
+            ctx.fill();
+
             ctx.fillStyle = bullet.color;
             ctx.beginPath();
             ctx.arc(bullet.x, bullet.y, bullet.r, 0, Math.PI * 2);
             ctx.fill();
 
-            // Inner glow
             ctx.fillStyle = '#e9d5ff';
             ctx.beginPath();
             ctx.arc(bullet.x, bullet.y, bullet.r * 0.4, 0, Math.PI * 2);
             ctx.fill();
-            ctx.restore();
             continue;
         }
 
         if (laser) {
-            ctx.save();
-            ctx.shadowBlur = 18;
-            ctx.shadowColor = bullet.color || '#facc15';
+            // Laser-Sprite: Glow via breiteres semi-transparentes Rechteck
+            ctx.fillStyle = 'rgba(250, 204, 21, 0.15)';
+            ctx.fillRect(bullet.x - 18, bullet.y - 12, 52, 24);
             ctx.drawImage(laser, bullet.x - 16, bullet.y - 8, 48, 16);
-            ctx.restore();
             continue;
         }
 
-        ctx.save();
-        ctx.shadowBlur = 14;
-        ctx.shadowColor = bullet.color || '#facc15';
+        // Fallback: einfaches Glow-Rechteck
+        ctx.fillStyle = bullet.color ? bullet.color.replace(')', ', 0.2)').replace('rgb(', 'rgba(') : 'rgba(250, 204, 21, 0.2)';
+        ctx.fillRect(bullet.x - 8, bullet.y - 7, 42, 14);
         ctx.fillStyle = bullet.color || '#facc15';
         ctx.fillRect(bullet.x - 4, bullet.y - 3, 34, 6);
-        ctx.shadowBlur = 0;
-        ctx.restore();
     }
 }

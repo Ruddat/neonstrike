@@ -162,8 +162,16 @@ export function drawPowerups(ctx) {
 
         ctx.rotate(p.t * 2.4);
 
-        ctx.shadowBlur = 20;
-        ctx.shadowColor = color;
+        // Glow via semi-transparente Kreise statt shadowBlur
+        ctx.fillStyle = color.replace(')', ', 0.15)').replace('#', 'rgba(');
+        // Einfache hex-to-rgba Umwandlung
+        const r = parseInt(color.slice(1,3), 16);
+        const g = parseInt(color.slice(3,5), 16);
+        const b = parseInt(color.slice(5,7), 16);
+        ctx.fillStyle = `rgba(${r}, ${g}, ${b}, 0.15)`;
+        ctx.beginPath();
+        ctx.arc(0, 0, 26, 0, Math.PI * 2);
+        ctx.fill();
 
         // Aussenring
         ctx.strokeStyle = color;
@@ -187,7 +195,6 @@ export function drawPowerups(ctx) {
         ctx.font = '900 11px Arial';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.shadowBlur = 0;
         ctx.fillText(label, 0, 1);
 
         ctx.restore();

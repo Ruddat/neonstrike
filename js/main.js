@@ -304,14 +304,19 @@ function render() {
             ctx.save();
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.shadowBlur = 36;
-            ctx.shadowColor = '#f97316';
+            // Glow via dickerer Text statt shadowBlur
+            ctx.fillStyle = 'rgba(249, 115, 22, 0.3)';
+            ctx.font = '900 68px Arial';
+            ctx.fillText('STAGE ' + stage.id, CONFIG.width / 2, CONFIG.height / 2 - 30);
+
             ctx.fillStyle = '#f97316';
             ctx.font = '900 64px Arial';
             ctx.fillText('STAGE ' + stage.id, CONFIG.width / 2, CONFIG.height / 2 - 30);
 
-            ctx.shadowBlur = 18;
-            ctx.shadowColor = '#38bdf8';
+            ctx.fillStyle = 'rgba(56, 189, 248, 0.3)';
+            ctx.font = '800 30px Arial';
+            ctx.fillText(stage.name.toUpperCase(), CONFIG.width / 2, CONFIG.height / 2 + 30);
+
             ctx.fillStyle = '#bae6fd';
             ctx.font = '800 28px Arial';
             ctx.fillText(stage.name.toUpperCase(), CONFIG.width / 2, CONFIG.height / 2 + 30);
@@ -429,7 +434,7 @@ function drawHyperspaceEffect(ctx) {
     ctx.fillStyle = vignette;
     ctx.fillRect(0, 0, CONFIG.width, CONFIG.height);
 
-    // HYPERSPACE Text
+    // HYPERSPACE Text (ohne shadowBlur)
     if (progress > 0.2 && progress < 0.88) {
         const textIn = Math.min(1, (progress - 0.2) * 4);
         const textOut = progress > 0.75 ? 1 - (progress - 0.75) / 0.13 : 1;
@@ -438,21 +443,24 @@ function drawHyperspaceEffect(ctx) {
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
 
-        ctx.shadowBlur = 36;
-        ctx.shadowColor = '#38bdf8';
+        // Glow via breiterer Text dahinter
+        ctx.fillStyle = `rgba(56, 189, 248, ${textAlpha * 0.3})`;
+        ctx.font = '900 60px Arial';
+        ctx.fillText('HYPERSPACE', cx, cy - 35);
+
         ctx.fillStyle = `rgba(56, 189, 248, ${textAlpha})`;
         ctx.font = '900 56px Arial';
         ctx.fillText('HYPERSPACE', cx, cy - 35);
 
         // Naechste Stage Info
         const nextStage = getStage(state.stageIndex + 1);
-        ctx.shadowBlur = 18;
-        ctx.shadowColor = '#f97316';
+        ctx.fillStyle = `rgba(249, 115, 22, ${textAlpha * 0.3})`;
+        ctx.font = '800 28px Arial';
+        ctx.fillText('NEXT: STAGE ' + nextStage.id + ' — ' + nextStage.name.toUpperCase(), cx, cy + 25);
+
         ctx.fillStyle = `rgba(249, 115, 22, ${textAlpha * 0.9})`;
         ctx.font = '800 26px Arial';
         ctx.fillText('NEXT: STAGE ' + nextStage.id + ' — ' + nextStage.name.toUpperCase(), cx, cy + 25);
-
-        ctx.shadowBlur = 0;
     }
 
     // Weisser Flash am Ende des Warps
@@ -629,16 +637,19 @@ function drawHud() {
     ctx.fillStyle = '#f8fafc';
     ctx.fillText(String(state.highscore || 0).padStart(7, '0'), CONFIG.width - 210, 76);
 
-    // COMBO (Katakis-Style)
+    // COMBO (Katakis-Style) — ohne shadowBlur
     if (state.comboCount >= 3) {
         ctx.save();
-        const pulse = Math.sin(performance.now() * 0.008) * 0.3 + 0.7;
-        ctx.shadowBlur = 22 * pulse;
-        ctx.shadowColor = '#facc15';
-        ctx.fillStyle = '#facc15';
-        ctx.font = '900 32px Arial';
+        // Glow via breiterer Text dahinter
+        ctx.fillStyle = 'rgba(250, 204, 21, 0.2)';
+        ctx.font = '900 36px Arial';
         ctx.textAlign = 'center';
         ctx.fillText('x' + state.comboMultiplier + ' COMBO!', CONFIG.width / 2, 50);
+
+        ctx.fillStyle = '#facc15';
+        ctx.font = '900 32px Arial';
+        ctx.fillText('x' + state.comboMultiplier + ' COMBO!', CONFIG.width / 2, 50);
+
         ctx.fillStyle = '#fef3c7';
         ctx.font = '800 18px Arial';
         ctx.fillText(state.comboCount + ' KILLS', CONFIG.width / 2, 76);
@@ -784,8 +795,11 @@ function drawBombIcon(ctx, x, y) {
     ctx.save();
     ctx.translate(x, y);
 
-    ctx.shadowBlur = 12;
-    ctx.shadowColor = '#f97316';
+    // Glow via semi-transparente Form statt shadowBlur
+    ctx.fillStyle = 'rgba(249, 115, 22, 0.15)';
+    ctx.beginPath();
+    ctx.arc(0, 0, 16, 0, Math.PI * 2);
+    ctx.fill();
 
     ctx.fillStyle = '#ef4444';
     ctx.beginPath();
@@ -797,7 +811,6 @@ function drawBombIcon(ctx, x, y) {
     ctx.arc(3, -3, 4, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.shadowBlur = 0;
     ctx.restore();
 }
 
@@ -810,14 +823,15 @@ function drawPauseOverlay() {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
-    ctx.shadowBlur = 28;
-    ctx.shadowColor = '#f97316';
+    // Glow via dickerer Text statt shadowBlur
+    ctx.fillStyle = 'rgba(249, 115, 22, 0.3)';
+    ctx.font = '900 68px Arial';
+    ctx.fillText('PAUSE', CONFIG.width / 2, CONFIG.height / 2 - 30);
+
     ctx.fillStyle = '#f97316';
     ctx.font = '900 64px Arial';
     ctx.fillText('PAUSE', CONFIG.width / 2, CONFIG.height / 2 - 30);
 
-    ctx.shadowBlur = 12;
-    ctx.shadowColor = '#38bdf8';
     ctx.fillStyle = '#bae6fd';
     ctx.font = '800 22px Arial';
     ctx.fillText(touch.active ? 'Tap Pause um fortzufahren' : 'P druecken um fortzufahren', CONFIG.width / 2, CONFIG.height / 2 + 30);

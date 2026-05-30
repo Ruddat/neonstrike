@@ -468,8 +468,12 @@ export function drawBoss(ctx) {
         const width = boss.phase === 3 ? 540 : 512;
         const height = boss.phase === 3 ? 202 : 192;
 
-        ctx.shadowBlur = boss.phase === 3 ? 34 : 24;
-        ctx.shadowColor = boss.phase === 3 ? '#ef4444' : '#f97316';
+        // Glow via semi-transparente Form statt shadowBlur
+        const glowColor = boss.phase === 3 ? 'rgba(239, 68, 68, 0.12)' : 'rgba(249, 115, 22, 0.1)';
+        ctx.fillStyle = glowColor;
+        ctx.beginPath();
+        ctx.arc(0, 0, width * 0.35, 0, Math.PI * 2);
+        ctx.fill();
 
         ctx.drawImage(sprite, -width / 2, -height / 2, width, height);
 
@@ -489,8 +493,12 @@ export function drawBoss(ctx) {
     // Fallback, falls Sprites fehlen
     const pulse = Math.sin(boss.t * 6) * 0.5 + 0.5;
 
-    ctx.shadowBlur = 22 + pulse * 24;
-    ctx.shadowColor = boss.phase === 3 ? '#ef4444' : '#f97316';
+    // Glow statt shadowBlur
+    const glowColor = boss.phase === 3 ? 'rgba(239, 68, 68, 0.15)' : 'rgba(249, 115, 22, 0.12)';
+    ctx.fillStyle = glowColor;
+    ctx.beginPath();
+    ctx.arc(0, 0, 160 + pulse * 20, 0, Math.PI * 2);
+    ctx.fill();
 
     ctx.fillStyle = boss.phase === 3 ? '#7f1d1d' : '#475569';
     ctx.strokeStyle = '#020617';
@@ -540,15 +548,12 @@ export function drawBossHud(ctx) {
         const flash = Math.floor(performance.now() / 180) % 2 === 0;
         ctx.textAlign = 'center';
 
-        ctx.shadowBlur = flash ? 36 : 18;
-        ctx.shadowColor = '#ef4444';
-        ctx.font = '900 46px Arial';
+        ctx.shadowBlur = 0;
         ctx.fillStyle = flash ? '#ef4444' : '#facc15';
+        ctx.font = '900 46px Arial';
         ctx.fillText('WARNING', CONFIG.width / 2, 120);
 
-        ctx.shadowBlur = 12;
-        ctx.shadowColor = '#38bdf8';
-        ctx.font = '800 24px Arial';
+        ctx.shadowBlur = 0;
         ctx.fillStyle = '#f8fafc';
         ctx.fillText('BOSS INCOMING', CONFIG.width / 2, 158);
 

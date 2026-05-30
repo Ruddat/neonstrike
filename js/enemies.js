@@ -376,12 +376,14 @@ export function drawEnemies(ctx) {
             ctx.save();
             ctx.translate(enemy.x, enemy.y);
 
-            ctx.shadowBlur = enemy.type === 'heavy' ? 18 : 12;
-            ctx.shadowColor = enemy.type === 'heavy' ? '#f97316' : '#38bdf8';
+            // Glow via semi-transparente Form (ohne shadowBlur)
+            ctx.fillStyle = enemy.type === 'heavy' ? 'rgba(249, 115, 22, 0.12)' : 'rgba(56, 189, 248, 0.1)';
+            ctx.beginPath();
+            ctx.arc(0, 0, width * 0.4, 0, Math.PI * 2);
+            ctx.fill();
 
             ctx.drawImage(sprite, -width / 2, -height / 2, width, height);
 
-            ctx.shadowBlur = 0;
             ctx.restore();
 
             continue;
@@ -418,12 +420,14 @@ function drawKamikaze(ctx, enemy) {
     ctx.save();
     ctx.translate(enemy.x, enemy.y);
 
-    // Rotierende Bewegungsrichtung
     const angle = Math.atan2(enemy.vy || 0, enemy.vx || -1);
     ctx.rotate(angle);
 
-    ctx.shadowBlur = 18;
-    ctx.shadowColor = '#ef4444';
+    // Glow via semi-transparente Form
+    ctx.fillStyle = 'rgba(239, 68, 68, 0.15)';
+    ctx.beginPath();
+    ctx.arc(0, 0, 22, 0, Math.PI * 2);
+    ctx.fill();
 
     // Dreieckige Form
     ctx.fillStyle = '#ef4444';
@@ -435,13 +439,11 @@ function drawKamikaze(ctx, enemy) {
     ctx.closePath();
     ctx.fill();
 
-    // Glow-Core
     ctx.fillStyle = '#facc15';
     ctx.beginPath();
     ctx.arc(4, 0, 6, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.shadowBlur = 0;
     ctx.restore();
 }
 
@@ -452,10 +454,12 @@ function drawFlanker(ctx, enemy) {
     const angle = Math.atan2(enemy.vy || 0, enemy.vx || -1);
     ctx.rotate(angle);
 
-    ctx.shadowBlur = 14;
-    ctx.shadowColor = '#a855f7';
+    // Glow
+    ctx.fillStyle = 'rgba(168, 85, 247, 0.12)';
+    ctx.beginPath();
+    ctx.arc(0, 0, 18, 0, Math.PI * 2);
+    ctx.fill();
 
-    // Schlanke Form
     ctx.fillStyle = '#7c3aed';
     ctx.beginPath();
     ctx.moveTo(-20, -18);
@@ -468,7 +472,6 @@ function drawFlanker(ctx, enemy) {
     ctx.fillStyle = '#c084fc';
     ctx.fillRect(-8, -3, 12, 6);
 
-    ctx.shadowBlur = 0;
     ctx.restore();
 }
 
@@ -476,10 +479,12 @@ function drawSniper(ctx, enemy) {
     ctx.save();
     ctx.translate(enemy.x, enemy.y);
 
-    ctx.shadowBlur = 16;
-    ctx.shadowColor = '#facc15';
+    // Glow
+    ctx.fillStyle = 'rgba(250, 204, 21, 0.1)';
+    ctx.beginPath();
+    ctx.arc(0, 0, 22, 0, Math.PI * 2);
+    ctx.fill();
 
-    // Rechteckige Form mit Zielfernrohr-Look
     ctx.fillStyle = '#854d0e';
     ctx.beginPath();
     ctx.moveTo(-28, -12);
@@ -490,14 +495,12 @@ function drawSniper(ctx, enemy) {
     ctx.closePath();
     ctx.fill();
 
-    // Sniper-Scope
     ctx.strokeStyle = '#facc15';
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.arc(8, 0, 8, 0, Math.PI * 2);
     ctx.stroke();
 
-    // Targeting Laser
     ctx.strokeStyle = 'rgba(250, 204, 21, .3)';
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -505,34 +508,34 @@ function drawSniper(ctx, enemy) {
     ctx.lineTo(-120, 0);
     ctx.stroke();
 
-    ctx.shadowBlur = 0;
     ctx.restore();
 }
 
 export function drawEnemyBullets(ctx) {
     for (const bullet of state.enemyBullets) {
-        ctx.save();
-
+        // Glow via groesserer semi-transparenter Kreis statt shadowBlur
         if (bullet.homing) {
-            ctx.shadowBlur = 22;
-            ctx.shadowColor = '#ef4444';
+            ctx.fillStyle = 'rgba(239, 68, 68, 0.2)';
+            ctx.beginPath();
+            ctx.arc(bullet.x, bullet.y, bullet.r * 2, 0, Math.PI * 2);
+            ctx.fill();
             ctx.fillStyle = '#fca5a5';
         } else if (bullet.color === '#fca5a5') {
-            // Sniper-Bullets: rot
-            ctx.shadowBlur = 18;
-            ctx.shadowColor = '#ef4444';
+            ctx.fillStyle = 'rgba(239, 68, 68, 0.15)';
+            ctx.beginPath();
+            ctx.arc(bullet.x, bullet.y, bullet.r * 1.8, 0, Math.PI * 2);
+            ctx.fill();
             ctx.fillStyle = '#fca5a5';
         } else {
-            ctx.shadowBlur = 14;
-            ctx.shadowColor = '#22c55e';
+            ctx.fillStyle = 'rgba(34, 197, 94, 0.15)';
+            ctx.beginPath();
+            ctx.arc(bullet.x, bullet.y, bullet.r * 1.8, 0, Math.PI * 2);
+            ctx.fill();
             ctx.fillStyle = '#86efac';
         }
 
         ctx.beginPath();
         ctx.arc(bullet.x, bullet.y, bullet.r, 0, Math.PI * 2);
         ctx.fill();
-
-        ctx.shadowBlur = 0;
-        ctx.restore();
     }
 }

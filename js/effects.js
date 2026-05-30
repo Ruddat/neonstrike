@@ -17,8 +17,8 @@ export function spawnExplosion(x, y, size = 1) {
         duration: 0.42,
     });
 
-    // Debris-Partikel
-    const debrisCount = Math.floor(4 + size * 4);
+    // Debris-Partikel (weniger auf Mobile)
+    const debrisCount = Math.floor(3 + size * 3);
     for (let i = 0; i < debrisCount; i++) {
         const angle = Math.random() * Math.PI * 2;
         const speed = 80 + Math.random() * 200 * size;
@@ -40,7 +40,7 @@ export function spawnExplosion(x, y, size = 1) {
 }
 
 export function spawnDebris(x, y, size = 1) {
-    const count = Math.floor(2 + size * 3);
+    const count = Math.floor(2 + size * 2);
     for (let i = 0; i < count; i++) {
         const angle = Math.random() * Math.PI * 2;
         const speed = 40 + Math.random() * 120 * size;
@@ -62,17 +62,17 @@ export function spawnThrustParticle(x, y) {
     state.particles.push({
         type: 'thrust',
         x,
-        y: y + (Math.random() - 0.5) * 8,
-        vx: -120 - Math.random() * 80,
-        vy: (Math.random() - 0.5) * 30,
-        size: 3 + Math.random() * 4,
+        y: y + (Math.random() - 0.5) * 6,
+        vx: -100 - Math.random() * 60,
+        vy: (Math.random() - 0.5) * 20,
+        size: 2 + Math.random() * 3,
         t: 0,
-        duration: 0.12 + Math.random() * 0.08,
+        duration: 0.1 + Math.random() * 0.06,
     });
 }
 
 export function spawnHitSpark(x, y) {
-    const count = 4 + Math.floor(Math.random() * 4);
+    const count = 3 + Math.floor(Math.random() * 3);
     for (let i = 0; i < count; i++) {
         const angle = Math.random() * Math.PI * 2;
         const speed = 60 + Math.random() * 140;
@@ -112,11 +112,9 @@ export function updateEffects(dt) {
             continue;
         }
 
-        // Bewegung fuer bewegliche Partikel
         if (fx.type === 'debris' || fx.type === 'hitSpark') {
             fx.x += (fx.vx || 0) * dt;
             fx.y += (fx.vy || 0) * dt;
-            // Reibung
             if (fx.vx) fx.vx *= 0.96;
             if (fx.vy) fx.vy *= 0.96;
         }
@@ -133,7 +131,6 @@ export function updateEffects(dt) {
 }
 
 export function drawEffects(ctx) {
-    // Explosion Sprites
     const frames = [
         assets.get('explosion01'),
         assets.get('explosion02'),
@@ -181,31 +178,31 @@ function drawExplosion(ctx, fx, frames, progress) {
         const size = 128 * fx.size;
         ctx.drawImage(sprite, -size / 2, -size / 2, size, size);
     } else {
-        // Fallback: Mehrstufige Explosion
+        // Fallback: Ohne shadowBlur, mit einfachen Kreisen
         ctx.globalAlpha = 1 - progress;
 
-        // Aeussere Explosion
+        // Aeussere Explosion (Glow via semi-transparente Kreise)
         const outerR = 48 * fx.size * (1 + progress * 0.8);
-        ctx.shadowBlur = 20;
-        ctx.shadowColor = '#f97316';
+        ctx.fillStyle = 'rgba(249, 115, 22, 0.4)';
+        ctx.beginPath();
+        ctx.arc(0, 0, outerR * 1.3, 0, Math.PI * 2);
+        ctx.fill();
+
         ctx.fillStyle = '#f97316';
         ctx.beginPath();
         ctx.arc(0, 0, outerR, 0, Math.PI * 2);
         ctx.fill();
 
-        // Innerer Kern
         ctx.fillStyle = '#facc15';
         ctx.beginPath();
         ctx.arc(0, 0, outerR * 0.5, 0, Math.PI * 2);
         ctx.fill();
 
-        // Weiss-Hot Core
         ctx.fillStyle = '#ffffff';
         ctx.beginPath();
         ctx.arc(0, 0, outerR * 0.2, 0, Math.PI * 2);
         ctx.fill();
 
-        ctx.shadowBlur = 0;
         ctx.globalAlpha = 1;
     }
 
@@ -213,7 +210,6 @@ function drawExplosion(ctx, fx, frames, progress) {
 }
 
 function drawDebris(ctx, fx, progress) {
-    ctx.save();
     ctx.globalAlpha = 1 - progress;
     ctx.fillStyle = fx.color || '#f97316';
     ctx.fillRect(
@@ -222,42 +218,26 @@ function drawDebris(ctx, fx, progress) {
         fx.size,
         fx.size
     );
-    ctx.restore();
+    ctx.globalAlpha = 1;
 }
 
 function drawThrust(ctx, fx, progress) {
-    ctx.save();
-    ctx.globalAlpha = (1 - progress) * 0.8;
-
-    // Thrust: Orange-Gelber Farbverlauf
+    // Einfache Rechteck statt Radial-Gradient — viel schneller
+    ctx.globalAlpha = (1 - progress) * 0.7;
     const r = fx.size * (1 - progress * 0.5);
-    const gradient = ctx.createRadialGradient(fx.x, fx.y, 0, fx.x, fx.y, r);
-    gradient.addColorStop(0, 'rgba(251, 191, 36, .9)');
-    gradient.addColorStop(0.5, 'rgba(249, 115, 22, .5)');
-    gradient.addColorStop(1, 'rgba(239, 68, 68, 0)');
-
-    ctx.fillStyle = gradient;
-    ctx.beginPath();
-    ctx.arc(fx.x, fx.y, r, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.restore();
+    ctx.fillStyle = '#fb923c';
+    ctx.fillRect(fx.x - r, fx.y - r * 0.6, r * 2, r * 1.2);
+    ctx.globalAlpha = 1;
 }
 
 function drawHitSpark(ctx, fx, progress) {
-    ctx.save();
+    // Ohne shadowBlur, einfacher weisser Kreis
     ctx.globalAlpha = 1 - progress;
-
     ctx.fillStyle = '#ffffff';
-    ctx.shadowBlur = 8;
-    ctx.shadowColor = '#facc15';
-
     ctx.beginPath();
     ctx.arc(fx.x, fx.y, fx.size * (1 - progress), 0, Math.PI * 2);
     ctx.fill();
-
-    ctx.shadowBlur = 0;
-    ctx.restore();
+    ctx.globalAlpha = 1;
 }
 
 function drawComboText(ctx, fx, progress) {
@@ -269,8 +249,11 @@ function drawComboText(ctx, fx, progress) {
 
     const scale = 1 + progress * 0.3;
 
-    ctx.shadowBlur = 18;
-    ctx.shadowColor = '#facc15';
+    // Ohne shadowBlur — nur doppelter Text fuer "Glow"-Effekt
+    ctx.fillStyle = 'rgba(250, 204, 21, 0.3)';
+    ctx.font = `900 ${Math.floor(26 * scale)}px Arial`;
+    ctx.fillText('x' + fx.multiplier, fx.x, fx.y);
+
     ctx.fillStyle = '#facc15';
     ctx.font = `900 ${Math.floor(22 * scale)}px Arial`;
     ctx.fillText('x' + fx.multiplier, fx.x, fx.y);
@@ -279,6 +262,5 @@ function drawComboText(ctx, fx, progress) {
     ctx.font = `800 ${Math.floor(14 * scale)}px Arial`;
     ctx.fillText(fx.combo + ' COMBO', fx.x, fx.y + 20);
 
-    ctx.shadowBlur = 0;
     ctx.restore();
 }
