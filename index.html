@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="de">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Neon Strike</title>
+    <link rel="stylesheet" href="css/game.css">
+</head>
+<body>
+    <main class="game-shell">
+        <canvas id="game" width="1280" height="720"></canvas>
+
+        <div class="overlay" id="overlay">
+            <section class="menu-card">
+                <p class="eyebrow">HTML5 Canvas Shooter</p>
+                <h1>Neon Strike</h1>
+                <p class="subtitle">
+                    Retro-Space-Shooter mit Wellen, Powerups, Bossfight und Highscore.
+                </p>
+                <button id="startButton" type="button">Start Game</button>
+                <p class="hint">
+                    WASD / Pfeiltasten bewegen · Space schießen · P Pause · Enter Neustart
+                </p>
+            </section>
+        </div>
+
+        <div class="hud-note">Canvas · Browsergame · keine Installation</div>
+    </main>
+
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>
