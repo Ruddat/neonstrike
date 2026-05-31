@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-app-capable" content="yes">
     <meta name="theme-color" content="#020617">
     <title>Neon Strike</title>
     <link rel="stylesheet" href="css/game.css">
@@ -22,7 +22,10 @@
                 <p class="subtitle">
                     Katakis-Style Retro-Shooter: Waffen-Upgrades, Combo-System, Formationen, Boss-Fights.
                 </p>
-                <button id="startButton" type="button">Start Game</button>
+                <div class="menu-buttons">
+                    <button id="startButton" type="button">Start Game</button>
+                    <button id="highscoreButton" type="button" style="margin-top:10px; background: linear-gradient(135deg, #38bdf8, #818cf8);">Highscores</button>
+                </div>
                 <p class="hint desktop-hint">
                     WASD / Pfeiltasten bewegen · Space schießen · K Bombe · P Pause · F Fullscreen
                 </p>
@@ -31,6 +34,9 @@
                 </p>
             </section>
         </div>
+
+        <!-- Highscore Table Overlay -->
+        <div class="highscore-overlay is-hidden" id="highscoreTable"></div>
 
         <button id="fullscreenBtn" class="fs-btn" type="button" title="Fullscreen (F)">&#x26F6;</button>
 

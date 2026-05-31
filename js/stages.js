@@ -122,5 +122,21 @@ export const stages = [
 ];
 
 export function getStage(index) {
-    return stages[index % stages.length];
+    const base = stages[index % stages.length];
+    const cycle = Math.floor(index / stages.length); // 0 for first 10, 1 for 11-20, etc.
+    const level = index + 1;
+
+    // Progressive difficulty: each cycle makes enemies faster and tougher
+    const speedBonus = cycle * 0.3;
+    const hpBonus = cycle * 2;
+
+    return {
+        ...base,
+        id: level,
+        level: level,
+        name: cycle > 0 ? base.name + ' +' + (cycle + 1) : base.name,
+        enemySpeed: base.enemySpeed + speedBonus,
+        enemyHpBonus: hpBonus,
+        bossHpBonus: cycle * 80,
+    };
 }

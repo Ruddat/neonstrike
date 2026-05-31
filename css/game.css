@@ -102,6 +102,12 @@ h1 {
     line-height: 1.55;
 }
 
+.menu-buttons {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
 button {
     border: 0;
     border-radius: 999px;
@@ -158,6 +164,92 @@ button {
     border-color: #38bdf8;
 }
 
+/* ===================== HIGHSCORE TABLE ===================== */
+.highscore-overlay {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    background: linear-gradient(135deg, rgba(2, 6, 23, .92), rgba(7, 12, 36, .85));
+    transition: opacity .3s ease, visibility .3s ease;
+    z-index: 20;
+    padding: 20px;
+}
+
+.highscore-overlay.is-hidden {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.highscore-overlay h2 {
+    text-shadow: 0 0 12px rgba(250, 204, 21, .5);
+}
+
+.hs-table {
+    width: min(520px, 90%);
+    border-collapse: collapse;
+    font-size: 14px;
+    margin-top: 8px;
+}
+
+.hs-table thead th {
+    color: #38bdf8;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 8px 10px;
+    border-bottom: 2px solid rgba(56, 189, 248, .3);
+    text-align: center;
+    font-size: 12px;
+}
+
+.hs-table tbody td {
+    padding: 8px 10px;
+    text-align: center;
+    border-bottom: 1px solid rgba(148, 163, 184, .12);
+    color: #e5f6ff;
+}
+
+.hs-row-top td {
+    color: #facc15;
+    font-weight: 800;
+}
+
+.hs-rank {
+    font-weight: 900;
+    color: #94a3b8;
+}
+
+.hs-row-top .hs-rank {
+    color: #facc15;
+}
+
+.hs-name {
+    font-weight: 900;
+    letter-spacing: 0.15em;
+    font-size: 16px;
+    color: #f8fafc;
+}
+
+.hs-score {
+    font-family: monospace;
+    font-weight: 800;
+    color: #f8fafc;
+    letter-spacing: 0.05em;
+}
+
+.hs-level,
+.hs-combo {
+    color: #94a3b8;
+    font-size: 13px;
+}
+
+.hs-date {
+    color: #64748b;
+    font-size: 12px;
+}
+
 /* ===================== MOBILE ===================== */
 @media (max-width: 768px), (hover: none) and (pointer: coarse) {
     .game-shell {
@@ -196,6 +288,28 @@ button {
     .subtitle {
         font-size: 13px;
         margin: 12px 0 20px;
+    }
+
+    .hs-table {
+        font-size: 11px;
+    }
+
+    .hs-table thead th {
+        font-size: 10px;
+        padding: 6px 6px;
+    }
+
+    .hs-table tbody td {
+        padding: 6px 6px;
+        font-size: 11px;
+    }
+
+    .hs-name {
+        font-size: 13px;
+    }
+
+    .highscore-overlay {
+        padding: 12px;
     }
 }
 

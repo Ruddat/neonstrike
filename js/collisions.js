@@ -82,7 +82,19 @@ function handlePlayerBulletsVsEnemies() {
                     }
 
                     maybeDropPowerup(enemy.x, enemy.y);
-                    spawnExplosion(enemy.x, enemy.y, enemy.type === 'heavy' ? 1.4 : 1);
+
+                    // Explosion size based on enemy type
+                    let explosionScale = 1;
+                    if (enemy.type === 'heavy') {
+                        explosionScale = 1.4;
+                    } else if (enemy.type === 'wobble') {
+                        explosionScale = 1.6;
+                    } else if (enemy.type === 'derp') {
+                        explosionScale = 0.8;
+                    } else if (enemy.type === 'drunk') {
+                        explosionScale = 1.0;
+                    }
+                    spawnExplosion(enemy.x, enemy.y, explosionScale);
 
                     if (state.killsThisStage >= state.killsForBoss && !state.bossActive) {
                         startBossWarning();
@@ -105,8 +117,17 @@ function handleEnemiesVsPlayer() {
     for (let i = state.enemies.length - 1; i >= 0; i--) {
         const enemy = state.enemies[i];
 
-        if (
-            rectsOverlap(
+        // Wobble uses circle collision since it's round
+        let hit = false;
+        if (enemy.type === 'wobble' || enemy.type === 'derp') {
+            // Circle-circle collision for round enemies
+            const dx = player.x - enemy.x;
+            const dy = player.y - enemy.y;
+            const playerR = 24;
+            const enemyR = enemy.w / 2;
+            hit = dx * dx + dy * dy < (playerR + enemyR) * (playerR + enemyR);
+        } else {
+            hit = rectsOverlap(
                 player.x - 30,
                 player.y - 18,
                 60,
@@ -115,11 +136,16 @@ function handleEnemiesVsPlayer() {
                 enemy.y - enemy.h / 2,
                 enemy.w,
                 enemy.h
-            )
-        ) {
+            );
+        }
+
+        if (hit) {
             // Kamikaze explodiert beim Kontakt
             if (enemy.type === 'kamikaze') {
                 spawnExplosion(enemy.x, enemy.y, 1.6);
+            } else if (enemy.type === 'wobble') {
+                // Wobble: big explosion
+                spawnExplosion(enemy.x, enemy.y, 1.8);
             } else {
                 spawnExplosion(enemy.x, enemy.y, 0.8);
             }

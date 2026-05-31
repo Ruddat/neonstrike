@@ -106,7 +106,7 @@ function spawnBoss() {
     state.bossWarning = false;
     state.bossActive = true;
 
-    const baseHp = 180 + state.stageIndex * 55;
+    const baseHp = 180 + state.stageIndex * 55 + (stage.bossHpBonus || 0);
 
     state.boss = {
         name: stage.bossName || 'Dread Cruiser',
@@ -405,6 +405,17 @@ function killBoss() {
     state.enemyBullets.length = 0;
     state.enemies.length = 0;
     state.killsThisStage = 0;
+
+    // Check for victory at level 99
+    if (state.stageIndex >= 98) {
+        // Won the game! (stageIndex is 0-based, so 98 = level 99)
+        state.victory = true;
+        state.running = false;
+        state.screenFlash = 1;
+        state.screenShake = 30;
+        audio.stopBoss();
+        return;
+    }
 
     // Hyperspace Jump zum naechsten Level starten
     state.hyperspaceJump = true;

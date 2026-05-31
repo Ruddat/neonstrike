@@ -53,6 +53,7 @@ import {
 import {
     loadHighscore,
     saveHighscoreIfNeeded,
+    addHighscoreEntry,
 } from './highscore.js';
 
 
@@ -63,6 +64,7 @@ const ctx = canvas.getContext('2d');
 const overlay = document.getElementById('overlay');
 const startButton = document.getElementById('startButton');
 const fsButton = document.getElementById('fullscreenBtn');
+let highscoreButton = null; // Wird in boot() gesetzt
 
 // ===================== FULLSCREEN =====================
 export function toggleFullscreen() {
@@ -118,6 +120,11 @@ function resetGame() {
     state.powerups.length = 0;
     state.gameOver = false;
     state.gameOverShown = false;
+    state.victory = false;
+    state.nameEntry = false;
+    state.nameChars = ['A', 'A', 'A'];
+    state.nameCursor = 0;
+    state.pendingHighscore = null;
 
     state.boss = null;
     state.bossActive = false;
@@ -158,6 +165,11 @@ function loop(time) {
         toggleFullscreen();
     }
 
+    // Name entry input handling
+    if (state.nameEntry) {
+        handleNameEntryInput();
+    }
+
     // Pause-Toggle pruefen
     if (consumePause()) {
         if (state.running && !state.gameOver) {
@@ -183,7 +195,12 @@ function loop(time) {
         drawPauseOverlay();
     }
 
-    if (state.running || state.paused) {
+    // Name entry overlay
+    if (state.nameEntry) {
+        drawNameEntryOverlay();
+    }
+
+    if (state.running || state.paused || state.nameEntry) {
         requestAnimationFrame(loop);
     }
 
@@ -191,6 +208,12 @@ function loop(time) {
     if (state.gameOver && !state.gameOverShown) {
         state.gameOverShown = true;
         showGameOver();
+    }
+
+    // Victory: show once
+    if (state.victory && !state.gameOverShown) {
+        state.gameOverShown = true;
+        showVictory();
     }
 }
 
@@ -236,8 +259,8 @@ function update(dt) {
             state.hyperspaceJump = false;
             state.warpStars.length = 0;
             state.stageIndex++;
-            // Boss braucht spaeter mehr Kills
-            state.killsForBoss = Math.min(45, state.killsForBoss + 3);
+            // Boss braucht spaeter mehr Kills - more aggressive scaling at higher levels
+            state.killsForBoss = Math.min(60, state.killsForBoss + 3 + Math.floor(state.stageIndex * 0.2));
             state.stageTransition = true;
             state.stageTransitionTimer = 3.0;
             backgroundDirty = true;
@@ -307,11 +330,11 @@ function render() {
             // Glow via dickerer Text statt shadowBlur
             ctx.fillStyle = 'rgba(249, 115, 22, 0.3)';
             ctx.font = '900 68px Arial';
-            ctx.fillText('STAGE ' + stage.id, CONFIG.width / 2, CONFIG.height / 2 - 30);
+            ctx.fillText('LEVEL ' + stage.level + '/99', CONFIG.width / 2, CONFIG.height / 2 - 30);
 
             ctx.fillStyle = '#f97316';
             ctx.font = '900 64px Arial';
-            ctx.fillText('STAGE ' + stage.id, CONFIG.width / 2, CONFIG.height / 2 - 30);
+            ctx.fillText('LEVEL ' + stage.level + '/99', CONFIG.width / 2, CONFIG.height / 2 - 30);
 
             ctx.fillStyle = 'rgba(56, 189, 248, 0.3)';
             ctx.font = '800 30px Arial';
@@ -322,6 +345,11 @@ function render() {
             ctx.fillText(stage.name.toUpperCase(), CONFIG.width / 2, CONFIG.height / 2 + 30);
             ctx.restore();
         }
+    }
+
+    // Victory overlay on canvas
+    if (state.victory && !state.nameEntry) {
+        drawVictoryOverlay();
     }
 
     drawHud();
@@ -347,6 +375,240 @@ function render() {
     }
 
     ctx.restore();
+}
+
+// ===================== VICTORY OVERLAY =====================
+function drawVictoryOverlay() {
+    ctx.save();
+
+    ctx.fillStyle = 'rgba(2, 6, 23, 0.75)';
+    ctx.fillRect(0, 0, CONFIG.width, CONFIG.height);
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    // YOU WIN!
+    ctx.fillStyle = 'rgba(250, 204, 21, 0.3)';
+    ctx.font = '900 88px Arial';
+    ctx.fillText('YOU WIN!', CONFIG.width / 2, CONFIG.height / 2 - 80);
+
+    ctx.fillStyle = '#facc15';
+    ctx.font = '900 84px Arial';
+    ctx.fillText('YOU WIN!', CONFIG.width / 2, CONFIG.height / 2 - 80);
+
+    // Score
+    ctx.fillStyle = '#f8fafc';
+    ctx.font = '800 36px Arial';
+    ctx.fillText('SCORE: ' + String(state.score).padStart(7, '0'), CONFIG.width / 2, CONFIG.height / 2 - 10);
+
+    ctx.fillStyle = '#bae6fd';
+    ctx.font = '800 22px Arial';
+    ctx.fillText('Level 99 erreicht! Max Combo: x' + state.maxCombo, CONFIG.width / 2, CONFIG.height / 2 + 30);
+
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '700 18px Arial';
+    ctx.fillText('Druecke ENTER fuer Highscore-Eintrag', CONFIG.width / 2, CONFIG.height / 2 + 70);
+
+    ctx.restore();
+}
+
+// ===================== NAME ENTRY =====================
+function handleNameEntryInput() {
+    // Handled via keydown event listener below
+}
+
+// Name entry key handler - set up separately
+let nameEntryKeyListener = null;
+
+function startNameEntry() {
+    state.nameEntry = true;
+    state.nameChars = ['A', 'A', 'A'];
+    state.nameCursor = 0;
+
+    if (nameEntryKeyListener) {
+        document.removeEventListener('keydown', nameEntryKeyListener);
+    }
+
+    nameEntryKeyListener = (e) => {
+        if (!state.nameEntry) {
+            document.removeEventListener('keydown', nameEntryKeyListener);
+            nameEntryKeyListener = null;
+            return;
+        }
+
+        e.preventDefault();
+
+        if (e.key === 'ArrowUp') {
+            // Increase current letter
+            const code = state.nameChars[state.nameCursor].charCodeAt(0);
+            const next = code >= 90 ? 65 : code + 1;
+            state.nameChars[state.nameCursor] = String.fromCharCode(next);
+        } else if (e.key === 'ArrowDown') {
+            // Decrease current letter
+            const code = state.nameChars[state.nameCursor].charCodeAt(0);
+            const prev = code <= 65 ? 90 : code - 1;
+            state.nameChars[state.nameCursor] = String.fromCharCode(prev);
+        } else if (e.key === 'ArrowLeft') {
+            state.nameCursor = Math.max(0, state.nameCursor - 1);
+        } else if (e.key === 'ArrowRight') {
+            state.nameCursor = Math.min(2, state.nameCursor + 1);
+        } else if (e.key === 'Enter') {
+            confirmNameEntry();
+        }
+    };
+
+    document.addEventListener('keydown', nameEntryKeyListener);
+}
+
+function confirmNameEntry() {
+    if (state.pendingHighscore) {
+        state.pendingHighscore.name = state.nameChars.join('');
+        addHighscoreEntry(state.pendingHighscore);
+        state.pendingHighscore = null;
+    }
+    state.nameEntry = false;
+
+    if (nameEntryKeyListener) {
+        document.removeEventListener('keydown', nameEntryKeyListener);
+        nameEntryKeyListener = null;
+    }
+
+    // Show highscore table
+    showHighscoreTable();
+}
+
+function drawNameEntryOverlay() {
+    ctx.save();
+
+    ctx.fillStyle = 'rgba(2, 6, 23, 0.85)';
+    ctx.fillRect(0, 0, CONFIG.width, CONFIG.height);
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    // Title
+    ctx.fillStyle = '#facc15';
+    ctx.font = '900 48px Arial';
+    ctx.fillText('HIGHSCORE!', CONFIG.width / 2, CONFIG.height / 2 - 120);
+
+    // Score
+    ctx.fillStyle = '#f8fafc';
+    ctx.font = '800 28px Arial';
+    ctx.fillText('SCORE: ' + String(state.score).padStart(7, '0'), CONFIG.width / 2, CONFIG.height / 2 - 70);
+
+    // Name entry boxes
+    const boxWidth = 72;
+    const boxHeight = 80;
+    const gap = 20;
+    const totalWidth = boxWidth * 3 + gap * 2;
+    const startX = CONFIG.width / 2 - totalWidth / 2;
+    const boxY = CONFIG.height / 2 - 20;
+
+    for (let i = 0; i < 3; i++) {
+        const bx = startX + i * (boxWidth + gap);
+        const isActive = i === state.nameCursor;
+
+        // Box background
+        ctx.fillStyle = isActive ? 'rgba(56, 189, 248, 0.2)' : 'rgba(30, 41, 59, 0.8)';
+        ctx.fillRect(bx, boxY, boxWidth, boxHeight);
+
+        // Box border
+        ctx.strokeStyle = isActive ? '#38bdf8' : '#475569';
+        ctx.lineWidth = isActive ? 3 : 2;
+        ctx.strokeRect(bx, boxY, boxWidth, boxHeight);
+
+        // Letter
+        ctx.fillStyle = isActive ? '#facc15' : '#f8fafc';
+        ctx.font = '900 48px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(state.nameChars[i], bx + boxWidth / 2, boxY + boxHeight / 2);
+
+        // Up/Down arrows
+        if (isActive) {
+            // Up arrow
+            ctx.fillStyle = '#38bdf8';
+            ctx.beginPath();
+            ctx.moveTo(bx + boxWidth / 2, boxY - 18);
+            ctx.lineTo(bx + boxWidth / 2 - 12, boxY - 4);
+            ctx.lineTo(bx + boxWidth / 2 + 12, boxY - 4);
+            ctx.closePath();
+            ctx.fill();
+
+            // Down arrow
+            ctx.beginPath();
+            ctx.moveTo(bx + boxWidth / 2, boxY + boxHeight + 18);
+            ctx.lineTo(bx + boxWidth / 2 - 12, boxY + boxHeight + 4);
+            ctx.lineTo(bx + boxWidth / 2 + 12, boxY + boxHeight + 4);
+            ctx.closePath();
+            ctx.fill();
+        }
+    }
+
+    // Instructions
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '700 18px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('Pfeiltasten: Buchstabe waehlen · ENTER: Bestaetigen', CONFIG.width / 2, boxY + boxHeight + 60);
+
+    ctx.restore();
+}
+
+// ===================== HIGHSCORE TABLE =====================
+function showHighscoreTable() {
+    const tableContainer = document.getElementById('highscoreTable');
+    if (!tableContainer) return;
+
+    // Build table content
+    let html = '<h2 style="color: #facc15; font-size: 28px; margin: 0 0 16px; letter-spacing: 0.1em;">TOP 10 HIGHSCORES</h2>';
+    html += '<table class="hs-table">';
+    html += '<thead><tr><th>#</th><th>Name</th><th>Score</th><th>Level</th><th>Combo</th><th>Datum</th></tr></thead>';
+    html += '<tbody>';
+
+    if (state.highscores.length === 0) {
+        html += '<tr><td colspan="6" style="padding: 20px; color: #94a3b8;">Noch keine Eintraege</td></tr>';
+    } else {
+        for (let i = 0; i < state.highscores.length; i++) {
+            const entry = state.highscores[i];
+            const isTop = i === 0;
+            const rowClass = isTop ? 'hs-row-top' : '';
+            html += `<tr class="${rowClass}">`;
+            html += `<td class="hs-rank">${i + 1}</td>`;
+            html += `<td class="hs-name">${entry.name || '---'}</td>`;
+            html += `<td class="hs-score">${String(entry.score).padStart(7, '0')}</td>`;
+            html += `<td class="hs-level">${entry.level || '-'}</td>`;
+            html += `<td class="hs-combo">x${entry.combo || 0}</td>`;
+            html += `<td class="hs-date">${entry.date || '-'}</td>`;
+            html += '</tr>';
+        }
+    }
+
+    html += '</tbody></table>';
+
+    tableContainer.innerHTML = html;
+    tableContainer.classList.remove('is-hidden');
+
+    // Hide after a few seconds or on key press
+    const dismissHandler = () => {
+        tableContainer.classList.add('is-hidden');
+        document.removeEventListener('keydown', dismissHandler);
+        document.removeEventListener('click', dismissHandler);
+
+        // Show restart overlay
+        overlay.querySelector('.eyebrow').textContent = state.victory ? 'Sieg!' : 'Game Over';
+        overlay.querySelector('h1').textContent = String(state.score).padStart(7, '0');
+        overlay.querySelector('.subtitle').textContent = 'Max Combo: x' + state.maxCombo + ' · Druecke Restart';
+        startButton.textContent = 'Restart';
+        overlay.classList.remove('is-hidden');
+
+        audio.stopIngame();
+        audio.playMenu();
+    };
+
+    // Auto-dismiss after 8 seconds
+    setTimeout(dismissHandler, 8000);
+    document.addEventListener('keydown', dismissHandler, { once: true });
+    document.addEventListener('click', dismissHandler, { once: true });
 }
 
 // ===================== HYPERSPACE WARP =====================
@@ -453,14 +715,16 @@ function drawHyperspaceEffect(ctx) {
         ctx.fillText('HYPERSPACE', cx, cy - 35);
 
         // Naechste Stage Info
-        const nextStage = getStage(state.stageIndex + 1);
-        ctx.fillStyle = `rgba(249, 115, 22, ${textAlpha * 0.3})`;
-        ctx.font = '800 28px Arial';
-        ctx.fillText('NEXT: STAGE ' + nextStage.id + ' — ' + nextStage.name.toUpperCase(), cx, cy + 25);
+        if (state.stageIndex + 1 < state.maxLevel) {
+            const nextStage = getStage(state.stageIndex + 1);
+            ctx.fillStyle = `rgba(249, 115, 22, ${textAlpha * 0.3})`;
+            ctx.font = '800 28px Arial';
+            ctx.fillText('NEXT: LEVEL ' + nextStage.level + '/99 — ' + nextStage.name.toUpperCase(), cx, cy + 25);
 
-        ctx.fillStyle = `rgba(249, 115, 22, ${textAlpha * 0.9})`;
-        ctx.font = '800 26px Arial';
-        ctx.fillText('NEXT: STAGE ' + nextStage.id + ' — ' + nextStage.name.toUpperCase(), cx, cy + 25);
+            ctx.fillStyle = `rgba(249, 115, 22, ${textAlpha * 0.9})`;
+            ctx.font = '800 26px Arial';
+            ctx.fillText('NEXT: LEVEL ' + nextStage.level + '/99 — ' + nextStage.name.toUpperCase(), cx, cy + 25);
+        }
     }
 
     // Weisser Flash am Ende des Warps
@@ -743,11 +1007,11 @@ function drawHud() {
         ctx.fillText('RAPID: ' + player.rapidTimer.toFixed(1) + 's', rapidX, CONFIG.height - 28);
     }
 
-    // STAGE
+    // LEVEL X/99
     ctx.textAlign = 'right';
     ctx.fillStyle = '#38bdf8';
     ctx.font = '800 24px Arial';
-    ctx.fillText('STAGE ' + stage.id, CONFIG.width - 34, CONFIG.height - 68);
+    ctx.fillText('LEVEL ' + stage.level + '/99', CONFIG.width - 34, CONFIG.height - 68);
 
     ctx.fillStyle = 'rgba(248,250,252,.82)';
     ctx.font = '700 16px Arial';
@@ -840,23 +1104,51 @@ function drawPauseOverlay() {
 }
 
 function showGameOver() {
-    const newRecord = saveHighscoreIfNeeded();
+    const entry = saveHighscoreIfNeeded();
 
-    overlay.querySelector('.eyebrow').textContent = newRecord ? 'New Highscore!' : 'Game Over';
-    overlay.querySelector('h1').textContent = String(state.score).padStart(7, '0');
+    if (entry) {
+        // Score qualifies for top 10 - show name entry
+        state.pendingHighscore = entry;
+        startNameEntry();
+        requestAnimationFrame(loop);
+    } else {
+        // No highscore - show standard game over
+        overlay.querySelector('.eyebrow').textContent = 'Game Over';
+        overlay.querySelector('h1').textContent = String(state.score).padStart(7, '0');
 
-    let subtitle = '';
-    if (newRecord) {
-        subtitle = 'NEUER REKORD! ';
+        let subtitle = 'Max Combo: x' + state.maxCombo + ' · Druecke Restart';
+        overlay.querySelector('.subtitle').textContent = subtitle;
+
+        startButton.textContent = 'Restart';
+        overlay.classList.remove('is-hidden');
+
+        audio.stopIngame();
+        audio.playMenu();
     }
-    subtitle += 'Max Combo: x' + state.maxCombo + ' · Druecke Restart';
-    overlay.querySelector('.subtitle').textContent = subtitle;
+}
 
-    startButton.textContent = 'Restart';
-    overlay.classList.remove('is-hidden');
+function showVictory() {
+    const entry = saveHighscoreIfNeeded();
 
-    audio.stopIngame();
-    audio.playMenu();
+    if (entry) {
+        // Score qualifies for top 10 - show name entry
+        state.pendingHighscore = entry;
+        startNameEntry();
+        requestAnimationFrame(loop);
+    } else {
+        // No highscore - show victory overlay directly
+        overlay.querySelector('.eyebrow').textContent = 'Sieg!';
+        overlay.querySelector('h1').textContent = String(state.score).padStart(7, '0');
+
+        let subtitle = 'Level 99 erreicht! Max Combo: x' + state.maxCombo + ' · Druecke Restart';
+        overlay.querySelector('.subtitle').textContent = subtitle;
+
+        startButton.textContent = 'Restart';
+        overlay.classList.remove('is-hidden');
+
+        audio.stopIngame();
+        audio.playMenu();
+    }
 }
 
 
@@ -875,6 +1167,29 @@ async function boot() {
 
     startButton.addEventListener('click', resetGame);
 
+    // Highscore button handler
+    highscoreButton = document.getElementById('highscoreButton');
+    if (highscoreButton) {
+        highscoreButton.addEventListener('click', () => {
+            showHighscoreTableFromMenu();
+        });
+    }
+
+    // Victory name entry - listen for Enter key to start name entry
+    document.addEventListener('keydown', (e) => {
+        if (state.victory && !state.nameEntry && !state.gameOver && e.key === 'Enter') {
+            const entry = saveHighscoreIfNeeded();
+            if (entry) {
+                state.pendingHighscore = entry;
+                startNameEntry();
+                requestAnimationFrame(loop);
+            } else {
+                // Just show highscore table
+                showHighscoreTable();
+            }
+        }
+    });
+
     document.addEventListener('click', () => {
         if (introActive) {
             introActive = false;
@@ -890,6 +1205,47 @@ async function boot() {
 
     initIntro();
     requestAnimationFrame(introLoop);
+}
+
+function showHighscoreTableFromMenu() {
+    const tableContainer = document.getElementById('highscoreTable');
+    if (!tableContainer) return;
+
+    let html = '<h2 style="color: #facc15; font-size: 28px; margin: 0 0 16px; letter-spacing: 0.1em;">TOP 10 HIGHSCORES</h2>';
+    html += '<table class="hs-table">';
+    html += '<thead><tr><th>#</th><th>Name</th><th>Score</th><th>Level</th><th>Combo</th><th>Datum</th></tr></thead>';
+    html += '<tbody>';
+
+    if (state.highscores.length === 0) {
+        html += '<tr><td colspan="6" style="padding: 20px; color: #94a3b8;">Noch keine Eintraege</td></tr>';
+    } else {
+        for (let i = 0; i < state.highscores.length; i++) {
+            const entry = state.highscores[i];
+            const isTop = i === 0;
+            const rowClass = isTop ? 'hs-row-top' : '';
+            html += `<tr class="${rowClass}">`;
+            html += `<td class="hs-rank">${i + 1}</td>`;
+            html += `<td class="hs-name">${entry.name || '---'}</td>`;
+            html += `<td class="hs-score">${String(entry.score).padStart(7, '0')}</td>`;
+            html += `<td class="hs-level">${entry.level || '-'}</td>`;
+            html += `<td class="hs-combo">x${entry.combo || 0}</td>`;
+            html += `<td class="hs-date">${entry.date || '-'}</td>`;
+            html += '</tr>';
+        }
+    }
+
+    html += '</tbody></table>';
+    html += '<p style="color: #94a3b8; margin-top: 12px; font-size: 14px;">Klicke zum Schliessen</p>';
+
+    tableContainer.innerHTML = html;
+    tableContainer.classList.remove('is-hidden');
+
+    const dismissHandler = () => {
+        tableContainer.classList.add('is-hidden');
+        tableContainer.removeEventListener('click', dismissHandler);
+    };
+
+    tableContainer.addEventListener('click', dismissHandler);
 }
 
 boot();

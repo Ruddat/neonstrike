@@ -4,6 +4,7 @@ export const state = {
     gameOver: false,
     gameOverShown: false,
     stageIndex: 0,
+    maxLevel: 99,
     wave: 1,
 
     killsThisStage: 0,
@@ -37,6 +38,18 @@ export const state = {
     // Formation System
     formationTimer: 0,
     formationWave: 0,
+
+    // Victory condition
+    victory: false,
+
+    // Highscore List
+    highscores: [],
+
+    // Name Entry
+    nameEntry: false,
+    nameChars: ['A', 'A', 'A'],
+    nameCursor: 0,
+    pendingHighscore: null,
 
     bullets: [],
     particles: [],

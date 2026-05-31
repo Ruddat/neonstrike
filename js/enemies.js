@@ -22,7 +22,7 @@ export function updateEnemies(dt) {
     if (state.formationTimer <= 0) {
         spawnFormation(speedMul);
         // Schnellere Formationen in hoeheren Stages
-        const baseInterval = Math.max(2.5, 4.5 - state.stageIndex * 0.25);
+        const baseInterval = Math.max(1.8, 4.5 - state.stageIndex * 0.3);
         state.formationTimer = baseInterval;
         state.formationWave++;
     }
@@ -31,7 +31,7 @@ export function updateEnemies(dt) {
     spawnTimer -= dt;
     if (spawnTimer <= 0) {
         spawnSingleEnemy(speedMul);
-        spawnTimer = Math.max(0.6, 1.4 - state.score / 25000);
+        spawnTimer = Math.max(0.4, 1.4 - state.score / 25000);
     }
 
     for (let i = state.enemies.length - 1; i >= 0; i--) {
@@ -45,7 +45,7 @@ export function updateEnemies(dt) {
         // Enemy Shooting
         enemy.fireTimer -= dt;
 
-        if (enemy.fireTimer <= 0 && enemy.x < CONFIG.width - 90 && enemy.type !== 'kamikaze') {
+        if (enemy.fireTimer <= 0 && enemy.x < CONFIG.width - 90 && enemy.type !== 'kamikaze' && enemy.type !== 'wobble') {
             fireEnemyBullet(enemy, speedMul);
         }
 
@@ -76,6 +76,24 @@ export function updateEnemies(dt) {
             }
         }
 
+        // Drunk: Zigzag movement
+        if (enemy.type === 'drunk') {
+            enemy.drinkDirTimer -= dt;
+            if (enemy.drinkDirTimer <= 0) {
+                enemy.drinkDir *= -1;
+                enemy.drinkDirTimer = 0.4 + Math.random() * 0.6;
+            }
+            enemy.x -= enemy.speed * dt;
+            enemy.y += enemy.drinkDir * 180 * dt;
+            enemy.y = Math.max(40, Math.min(CONFIG.height - 40, enemy.y));
+        }
+
+        // Wobble: Slow drifting movement
+        if (enemy.type === 'wobble') {
+            enemy.x -= enemy.speed * dt;
+            enemy.y = enemy.baseY + Math.sin(enemy.t * 1.5) * enemy.wave;
+        }
+
         if (enemy.x < -120 || enemy.x > CONFIG.width + 120) {
             state.enemies.splice(i, 1);
         }
@@ -87,6 +105,15 @@ export function updateEnemies(dt) {
 function updateEnemyMovement(enemy, dt, speedMul) {
     if (enemy.type === 'kamikaze') return; // Kamikaze hat eigene Bewegung
     if (enemy.type === 'flanker') return;  // Flanker hat eigene Bewegung
+    if (enemy.type === 'drunk') return;    // Drunk hat eigene Bewegung
+    if (enemy.type === 'wobble') return;   // Wobble hat eigene Bewegung
+
+    // Derp: Wobble movement (high frequency sine)
+    if (enemy.type === 'derp') {
+        enemy.x -= enemy.speed * dt;
+        enemy.y = enemy.baseY + Math.sin(enemy.t * 8) * 30;
+        return;
+    }
 
     // Standard-Bewegung: Links + Welle
     enemy.x -= enemy.speed * dt;
@@ -120,6 +147,37 @@ function fireEnemyBullet(enemy, speedMul) {
             });
         }
         enemy.fireTimer = 1.4;
+    } else if (enemy.type === 'derp') {
+        // Derp: Inaccurate shots with random spread
+        const baseAngle = Math.PI + (Math.random() - 0.5) * 1.2; // Wide spread
+        for (let i = 0; i < 2; i++) {
+            const spread = (Math.random() - 0.5) * 0.8;
+            const angle = baseAngle + spread;
+            state.enemyBullets.push({
+                x: enemy.x - 20,
+                y: enemy.y,
+                vx: Math.cos(angle) * 260 * speedMul,
+                vy: Math.sin(angle) * 260 * speedMul,
+                r: 4,
+                color: '#86efac',
+            });
+        }
+        enemy.fireTimer = 1.8 + Math.random() * 0.5;
+    } else if (enemy.type === 'drunk') {
+        // Drunk: Random direction shots, sometimes backwards!
+        const backwards = Math.random() < 0.3; // 30% chance to shoot backwards
+        const baseAngle = backwards
+            ? (Math.random() - 0.5) * 1.5 // Forwards-ish but wild
+            : Math.PI + (Math.random() - 0.5) * 2.0; // Random direction
+        state.enemyBullets.push({
+            x: backwards ? enemy.x + 20 : enemy.x - 20,
+            y: enemy.y,
+            vx: Math.cos(baseAngle) * 280 * speedMul,
+            vy: Math.sin(baseAngle) * 280 * speedMul,
+            r: 5,
+            color: '#fde047',
+        });
+        enemy.fireTimer = 1.5 + Math.random() * 0.5;
     } else {
         // Drone: Standard
         state.enemyBullets.push({
@@ -136,7 +194,7 @@ function fireEnemyBullet(enemy, speedMul) {
 // --- Formation Spawning (Katakis-Style) ---
 
 function spawnFormation(speedMul) {
-    const formType = state.formationWave % 6;
+    const formType = state.formationWave % 9;
 
     switch (formType) {
         case 0: spawnVFormation(speedMul); break;
@@ -145,10 +203,15 @@ function spawnFormation(speedMul) {
         case 3: spawnFlankerPair(speedMul); break;
         case 4: spawnKamikazeWave(speedMul); break;
         case 5: spawnSniperTeam(speedMul); break;
+        case 6: spawnDerpWave(speedMul); break;
+        case 7: spawnWobblePair(speedMul); break;
+        case 8: spawnDrunkSquad(speedMul); break;
     }
 }
 
 function spawnVFormation(speedMul) {
+    const stage = getStage(state.stageIndex);
+    const hpBonus = stage.enemyHpBonus || 0;
     const baseY = 100 + Math.random() * (CONFIG.height - 200);
     const count = 5 + Math.floor(state.stageIndex * 0.5);
 
@@ -162,7 +225,7 @@ function spawnVFormation(speedMul) {
             w: 52,
             h: 30,
             speed: (170 + Math.random() * 40) * speedMul,
-            hp: 2 + Math.floor(state.stageIndex * 0.4),
+            hp: 2 + Math.floor(state.stageIndex * 0.4) + hpBonus,
             points: 150 + state.stageIndex * 15,
             wave: 28,
             t: Math.random() * 10,
@@ -172,6 +235,8 @@ function spawnVFormation(speedMul) {
 }
 
 function spawnLineFormation(speedMul) {
+    const stage = getStage(state.stageIndex);
+    const hpBonus = stage.enemyHpBonus || 0;
     const y = 70 + Math.random() * (CONFIG.height - 140);
     const count = 6 + Math.floor(state.stageIndex * 0.3);
 
@@ -184,7 +249,7 @@ function spawnLineFormation(speedMul) {
             w: 52,
             h: 30,
             speed: (185 + Math.random() * 30) * speedMul,
-            hp: 2 + Math.floor(state.stageIndex * 0.3),
+            hp: 2 + Math.floor(state.stageIndex * 0.3) + hpBonus,
             points: 150 + state.stageIndex * 12,
             wave: 12,
             t: Math.random() * 10,
@@ -194,6 +259,8 @@ function spawnLineFormation(speedMul) {
 }
 
 function spawnCircleFormation(speedMul) {
+    const stage = getStage(state.stageIndex);
+    const hpBonus = stage.enemyHpBonus || 0;
     const cx = CONFIG.width + 160;
     const cy = CONFIG.height / 2;
     const count = 8;
@@ -212,7 +279,7 @@ function spawnCircleFormation(speedMul) {
             w: i % 3 === 0 ? 76 : 52,
             h: i % 3 === 0 ? 44 : 30,
             speed: (140 + Math.random() * 30) * speedMul,
-            hp: i % 3 === 0 ? 5 + Math.floor(state.stageIndex * 0.8) : 2 + Math.floor(state.stageIndex * 0.4),
+            hp: (i % 3 === 0 ? 5 + Math.floor(state.stageIndex * 0.8) : 2 + Math.floor(state.stageIndex * 0.4)) + hpBonus,
             points: i % 3 === 0 ? 360 + state.stageIndex * 40 : 150 + state.stageIndex * 15,
             wave: 20,
             t: angle,
@@ -222,6 +289,8 @@ function spawnCircleFormation(speedMul) {
 }
 
 function spawnFlankerPair(speedMul) {
+    const stage = getStage(state.stageIndex);
+    const hpBonus = stage.enemyHpBonus || 0;
     // Zwei Flanker kommen von oben und unten
     for (const dir of [-1, 1]) {
         state.enemies.push({
@@ -232,7 +301,7 @@ function spawnFlankerPair(speedMul) {
             w: 48,
             h: 32,
             speed: 220 * speedMul,
-            hp: 3 + Math.floor(state.stageIndex * 0.5),
+            hp: 3 + Math.floor(state.stageIndex * 0.5) + hpBonus,
             points: 250 + state.stageIndex * 20,
             wave: 0,
             t: 0,
@@ -244,6 +313,8 @@ function spawnFlankerPair(speedMul) {
 }
 
 function spawnKamikazeWave(speedMul) {
+    const stage = getStage(state.stageIndex);
+    const hpBonus = stage.enemyHpBonus || 0;
     const count = 2 + Math.floor(state.stageIndex * 0.3);
 
     for (let i = 0; i < count; i++) {
@@ -256,7 +327,7 @@ function spawnKamikazeWave(speedMul) {
             w: 36,
             h: 36,
             speed: 0, // Wird durch vx/vy gesteuert
-            hp: 1 + Math.floor(state.stageIndex * 0.2),
+            hp: 1 + Math.floor(state.stageIndex * 0.2) + hpBonus,
             points: 200 + state.stageIndex * 25,
             wave: 0,
             t: 0,
@@ -268,6 +339,8 @@ function spawnKamikazeWave(speedMul) {
 }
 
 function spawnSniperTeam(speedMul) {
+    const stage = getStage(state.stageIndex);
+    const hpBonus = stage.enemyHpBonus || 0;
     const count = 2 + Math.floor(state.stageIndex * 0.2);
 
     for (let i = 0; i < count; i++) {
@@ -280,7 +353,7 @@ function spawnSniperTeam(speedMul) {
             w: 56,
             h: 28,
             speed: (90 + Math.random() * 30) * speedMul,
-            hp: 3 + Math.floor(state.stageIndex * 0.6),
+            hp: 3 + Math.floor(state.stageIndex * 0.6) + hpBonus,
             points: 300 + state.stageIndex * 30,
             wave: 15,
             t: Math.random() * 10,
@@ -289,25 +362,137 @@ function spawnSniperTeam(speedMul) {
     }
 }
 
+// --- NEW SILLY/DERPY ENEMY SPAWNERS ---
+
+function spawnDerpWave(speedMul) {
+    const stage = getStage(state.stageIndex);
+    const hpBonus = stage.enemyHpBonus || 0;
+    const count = 5 + Math.floor(state.stageIndex * 0.2);
+    const baseY = 80 + Math.random() * (CONFIG.height - 160);
+
+    for (let i = 0; i < count; i++) {
+        state.enemies.push({
+            type: 'derp',
+            x: CONFIG.width + 80 + i * 55,
+            y: baseY + (i - Math.floor(count / 2)) * 35,
+            baseY: baseY + (i - Math.floor(count / 2)) * 35,
+            w: 44,
+            h: 44,
+            speed: (120 + Math.random() * 40) * speedMul,
+            hp: 1 + hpBonus,
+            points: 80 + state.stageIndex * 8,
+            wave: 30,
+            t: Math.random() * 10,
+            fireTimer: 1.5 + Math.random() * 1.0,
+        });
+    }
+}
+
+function spawnWobblePair(speedMul) {
+    const stage = getStage(state.stageIndex);
+    const hpBonus = stage.enemyHpBonus || 0;
+
+    for (let i = 0; i < 2; i++) {
+        const y = 180 + i * (CONFIG.height - 360);
+        state.enemies.push({
+            type: 'wobble',
+            x: CONFIG.width + 80 + i * 100,
+            y: y,
+            baseY: y,
+            w: 64,
+            h: 64,
+            speed: (70 + Math.random() * 20) * speedMul,
+            hp: 4 + Math.floor(state.stageIndex * 0.3) + hpBonus,
+            points: 180 + state.stageIndex * 15,
+            wave: 40,
+            t: Math.random() * 10,
+            fireTimer: 999, // Doesn't shoot, contact damage
+        });
+    }
+}
+
+function spawnDrunkSquad(speedMul) {
+    const stage = getStage(state.stageIndex);
+    const hpBonus = stage.enemyHpBonus || 0;
+    const count = 3 + Math.floor(state.stageIndex * 0.2);
+    const baseY = 120 + Math.random() * (CONFIG.height - 240);
+
+    for (let i = 0; i < count; i++) {
+        const dir = (i % 2 === 0) ? 1 : -1;
+        state.enemies.push({
+            type: 'drunk',
+            x: CONFIG.width + 80 + i * 70,
+            y: baseY + (i - Math.floor(count / 2)) * 50,
+            baseY: baseY + (i - Math.floor(count / 2)) * 50,
+            w: 52,
+            h: 30,
+            speed: (130 + Math.random() * 40) * speedMul,
+            hp: 3 + Math.floor(state.stageIndex * 0.4) + hpBonus,
+            points: 120 + state.stageIndex * 12,
+            wave: 0,
+            t: Math.random() * 10,
+            fireTimer: 1.2 + Math.random() * 0.8,
+            drinkDir: dir,
+            drinkDirTimer: 0.4 + Math.random() * 0.6,
+        });
+    }
+}
+
 function spawnSingleEnemy(speedMul) {
-    // Einzelne Feinde zwischen Formationen
-    const type = Math.random() > 0.72 ? 'heavy' : 'drone';
+    const stage = getStage(state.stageIndex);
+    const hpBonus = stage.enemyHpBonus || 0;
+
+    // At higher levels, also spawn derp/drunk/wobble as single enemies
+    let type;
+    const roll = Math.random();
+    if (state.stageIndex >= 3 && roll > 0.88) {
+        type = 'derp';
+    } else if (state.stageIndex >= 5 && roll > 0.82) {
+        type = 'drunk';
+    } else if (state.stageIndex >= 7 && roll > 0.78) {
+        type = 'wobble';
+    } else if (roll > 0.72) {
+        type = 'heavy';
+    } else {
+        type = 'drone';
+    }
+
     const y = 70 + Math.random() * (CONFIG.height - 140);
 
-    state.enemies.push({
+    const enemyData = {
         type,
         x: CONFIG.width + 80,
         y,
         baseY: y,
-        w: type === 'heavy' ? 76 : 52,
-        h: type === 'heavy' ? 44 : 30,
-        speed: (type === 'heavy' ? 125 : 190 + Math.random() * 55) * speedMul,
-        hp: type === 'heavy' ? 5 + Math.floor(state.stageIndex * 0.8) : 2 + Math.floor(state.stageIndex * 0.4),
-        points: type === 'heavy' ? 360 + state.stageIndex * 40 : 150 + state.stageIndex * 15,
-        wave: type === 'heavy' ? 18 : 34,
+        w: type === 'heavy' ? 76 : type === 'wobble' ? 64 : type === 'derp' ? 44 : 52,
+        h: type === 'heavy' ? 44 : type === 'wobble' ? 64 : type === 'derp' ? 44 : 30,
+        speed: (type === 'heavy' ? 125 : type === 'wobble' ? 70 : type === 'derp' ? 120 : type === 'drunk' ? 130 : 190 + Math.random() * 55) * speedMul,
+        points: type === 'heavy' ? 360 + state.stageIndex * 40 : type === 'wobble' ? 180 + state.stageIndex * 15 : type === 'derp' ? 80 + state.stageIndex * 8 : type === 'drunk' ? 120 + state.stageIndex * 12 : 150 + state.stageIndex * 15,
+        wave: type === 'heavy' ? 18 : type === 'wobble' ? 40 : 34,
         t: Math.random() * 10,
-        fireTimer: type === 'heavy' ? 1.3 : 2.0,
-    });
+    };
+
+    // HP based on type
+    if (type === 'heavy') {
+        enemyData.hp = 5 + Math.floor(state.stageIndex * 0.8) + hpBonus;
+        enemyData.fireTimer = 1.3;
+    } else if (type === 'wobble') {
+        enemyData.hp = 4 + Math.floor(state.stageIndex * 0.3) + hpBonus;
+        enemyData.fireTimer = 999; // Doesn't shoot
+    } else if (type === 'derp') {
+        enemyData.hp = 1 + hpBonus;
+        enemyData.fireTimer = 1.5 + Math.random() * 1.0;
+    } else if (type === 'drunk') {
+        enemyData.hp = 3 + Math.floor(state.stageIndex * 0.4) + hpBonus;
+        enemyData.fireTimer = 1.2 + Math.random() * 0.8;
+        enemyData.drinkDir = Math.random() > 0.5 ? 1 : -1;
+        enemyData.drinkDirTimer = 0.4 + Math.random() * 0.6;
+    } else {
+        enemyData.hp = 2 + Math.floor(state.stageIndex * 0.4) + hpBonus;
+        enemyData.fireTimer = 2.0;
+    }
+
+    state.enemies.push(enemyData);
 }
 
 function updateEnemyBullets(dt) {
@@ -362,6 +547,24 @@ export function drawEnemies(ctx) {
         // Sniper: Spezielle Darstellung
         if (enemy.type === 'sniper') {
             drawSniper(ctx, enemy);
+            continue;
+        }
+
+        // Derp: Derpy one-eyed enemy
+        if (enemy.type === 'derp') {
+            drawDerp(ctx, enemy);
+            continue;
+        }
+
+        // Wobble: Trembling blob enemy
+        if (enemy.type === 'wobble') {
+            drawWobble(ctx, enemy);
+            continue;
+        }
+
+        // Drunk: Drunken zigzag enemy
+        if (enemy.type === 'drunk') {
+            drawDrunk(ctx, enemy);
             continue;
         }
 
@@ -511,6 +714,194 @@ function drawSniper(ctx, enemy) {
     ctx.restore();
 }
 
+// --- NEW SILLY/DERPY ENEMY DRAW FUNCTIONS ---
+
+function drawDerp(ctx, enemy) {
+    ctx.save();
+    ctx.translate(enemy.x, enemy.y);
+
+    // Wobble rotation for derpy look
+    const wobble = Math.sin(enemy.t * 6) * 0.15;
+    ctx.rotate(wobble);
+
+    // Glow
+    ctx.fillStyle = 'rgba(34, 197, 94, 0.12)';
+    ctx.beginPath();
+    ctx.arc(0, 0, 28, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Big round body
+    ctx.fillStyle = '#22c55e';
+    ctx.beginPath();
+    ctx.arc(0, 0, 20, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Body outline
+    ctx.strokeStyle = '#15803d';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(0, 0, 20, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Giant eye (left, bigger)
+    ctx.fillStyle = '#fef08a';
+    ctx.beginPath();
+    ctx.arc(-4, -4, 9, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Tiny eye (right, smaller)
+    ctx.fillStyle = '#fef08a';
+    ctx.beginPath();
+    ctx.arc(10, -2, 4, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Pupils - looking towards player (roughly)
+    const lookX = state.player.x > enemy.x ? 1 : -1;
+    ctx.fillStyle = '#020617';
+    ctx.beginPath();
+    ctx.arc(-4 + lookX * 3, -4, 4, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#020617';
+    ctx.beginPath();
+    ctx.arc(10 + lookX * 2, -2, 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Dopey mouth
+    ctx.strokeStyle = '#15803d';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(3, 8, 6, 0.2, Math.PI - 0.2);
+    ctx.stroke();
+
+    ctx.restore();
+}
+
+function drawWobble(ctx, enemy) {
+    ctx.save();
+    ctx.translate(enemy.x, enemy.y);
+
+    // Glow
+    ctx.fillStyle = 'rgba(236, 72, 153, 0.1)';
+    ctx.beginPath();
+    ctx.arc(0, 0, 40, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Amorphous blob shape with wobbly edges
+    ctx.fillStyle = '#ec4899';
+    ctx.beginPath();
+    const segments = 16;
+    for (let i = 0; i <= segments; i++) {
+        const angle = (Math.PI * 2 / segments) * i;
+        // Wobbly radius with high-frequency vibration
+        const wobbleR = 26 + Math.sin(angle * 3 + enemy.t * 12) * 6 + Math.sin(angle * 5 + enemy.t * 18) * 3;
+        const px = Math.cos(angle) * wobbleR;
+        const py = Math.sin(angle) * wobbleR;
+        if (i === 0) {
+            ctx.moveTo(px, py);
+        } else {
+            ctx.lineTo(px, py);
+        }
+    }
+    ctx.closePath();
+    ctx.fill();
+
+    // Inner blob (lighter)
+    ctx.fillStyle = '#f9a8d4';
+    ctx.beginPath();
+    for (let i = 0; i <= segments; i++) {
+        const angle = (Math.PI * 2 / segments) * i;
+        const wobbleR = 14 + Math.sin(angle * 4 + enemy.t * 15) * 4;
+        const px = Math.cos(angle) * wobbleR;
+        const py = Math.sin(angle) * wobbleR;
+        if (i === 0) {
+            ctx.moveTo(px, py);
+        } else {
+            ctx.lineTo(px, py);
+        }
+    }
+    ctx.closePath();
+    ctx.fill();
+
+    // Tiny dot eyes
+    ctx.fillStyle = '#020617';
+    ctx.beginPath();
+    ctx.arc(-6, -4, 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(6, -4, 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Wobbly mouth
+    ctx.strokeStyle = '#831843';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(-5, 6);
+    ctx.quadraticCurveTo(0, 8 + Math.sin(enemy.t * 10) * 3, 5, 6);
+    ctx.stroke();
+
+    ctx.restore();
+}
+
+function drawDrunk(ctx, enemy) {
+    ctx.save();
+    ctx.translate(enemy.x, enemy.y);
+
+    // Random tilt for drunk look
+    const tilt = Math.sin(enemy.t * 2.5) * 0.3;
+    ctx.rotate(tilt);
+
+    // Glow
+    ctx.fillStyle = 'rgba(234, 179, 8, 0.1)';
+    ctx.beginPath();
+    ctx.arc(0, 0, 24, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Standard enemy body shape but yellow-ish
+    ctx.fillStyle = '#eab308';
+    ctx.strokeStyle = '#854d0e';
+    ctx.lineWidth = 2;
+
+    ctx.beginPath();
+    ctx.moveTo(-24, 0);
+    ctx.lineTo(24, -14);
+    ctx.lineTo(18, 0);
+    ctx.lineTo(24, 14);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Swirly eyes (drunk)
+    ctx.fillStyle = '#854d0e';
+    const swirl = enemy.t * 3;
+    // Left eye
+    ctx.beginPath();
+    ctx.arc(-8 + Math.cos(swirl) * 2, -4 + Math.sin(swirl) * 2, 3, 0, Math.PI * 2);
+    ctx.fill();
+    // Right eye
+    ctx.beginPath();
+    ctx.arc(4 + Math.cos(swirl + Math.PI) * 2, -4 + Math.sin(swirl + Math.PI) * 2, 3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Dizzy mouth
+    ctx.strokeStyle = '#854d0e';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(0, 5, 5, 0.3 + Math.sin(enemy.t * 4) * 0.3, Math.PI - 0.3 + Math.sin(enemy.t * 4) * 0.3);
+    ctx.stroke();
+
+    // Engine glow (sometimes on wrong side - drunk!)
+    const wrongSide = Math.sin(enemy.t * 1.5) > 0;
+    ctx.fillStyle = '#facc15';
+    if (wrongSide) {
+        ctx.fillRect(20, -2, 8, 4); // Wrong side
+    } else {
+        ctx.fillRect(-28, -2, 8, 4); // Right side
+    }
+
+    ctx.restore();
+}
+
 export function drawEnemyBullets(ctx) {
     for (const bullet of state.enemyBullets) {
         // Glow via groesserer semi-transparenter Kreis statt shadowBlur
@@ -526,6 +917,20 @@ export function drawEnemyBullets(ctx) {
             ctx.arc(bullet.x, bullet.y, bullet.r * 1.8, 0, Math.PI * 2);
             ctx.fill();
             ctx.fillStyle = '#fca5a5';
+        } else if (bullet.color === '#86efac') {
+            // Derp bullets: green-ish
+            ctx.fillStyle = 'rgba(34, 197, 94, 0.15)';
+            ctx.beginPath();
+            ctx.arc(bullet.x, bullet.y, bullet.r * 1.8, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#86efac';
+        } else if (bullet.color === '#fde047') {
+            // Drunk bullets: yellow-ish
+            ctx.fillStyle = 'rgba(234, 179, 8, 0.15)';
+            ctx.beginPath();
+            ctx.arc(bullet.x, bullet.y, bullet.r * 1.8, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#fde047';
         } else {
             ctx.fillStyle = 'rgba(34, 197, 94, 0.15)';
             ctx.beginPath();
