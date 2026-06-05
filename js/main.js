@@ -24,6 +24,7 @@ import { getStage, getScrollDirection } from './stages.js';
 import {
     updateBackground,
     drawBackground,
+    resetBgImageScroll,
 } from './background.js';
 
 import { assets } from './assets.js';
@@ -280,6 +281,8 @@ function update(dt) {
             }
 
             state.scrollDirection = newDirection;
+            // Hintergrund-Bild-Scroll zuruecksetzen
+            resetBgImageScroll();
             // Spieler-Repositionierung bei Richtungswechsel
             if (newDirection === 'vertical') {
                 state.player.x = CONFIG.width / 2;

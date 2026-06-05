@@ -38,6 +38,10 @@ this.loadImage('explosion05', 'assets/sprites/fx/explosion_05.png'),
 this.loadImage('explosion06', 'assets/sprites/fx/explosion_06.png'),
 
 
+        // Background images (scrolling)
+        this.loadImage('bgCity01', 'assets/backgrounds/bg_city_01.jpg'),
+        this.loadImage('bgCity02', 'assets/backgrounds/bg_city_02.jpg'),
+
     ]);
 },
 

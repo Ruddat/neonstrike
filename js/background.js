@@ -1,6 +1,7 @@
 import { CONFIG } from './config.js';
 import { state } from './state.js';
 import { getStage } from './stages.js';
+import { assets } from './assets.js';
 import {
     isVertical,
     bgScrollX, bgScrollY,
@@ -57,6 +58,18 @@ const parallaxObjects = Array.from({ length: 18 }, (_, i) => ({
     layer: i % 3,
 }));
 
+// === SCROLLING BACKGROUND IMAGE STATE ===
+let bgImageOffset = 0;   // Horizontal scroll offset
+let bgImageOffsetY = 0;  // Vertical scroll offset
+let bgImageKey = null;   // Current background image key
+let bgImageLastStage = -1; // Track stage changes to reset offset
+
+/** Reset background image scroll offset (call on stage change) */
+export function resetBgImageScroll() {
+    bgImageOffset = 0;
+    bgImageOffsetY = 0;
+}
+
 // --- Offscreen-Canvas Cache fuer statische Hintergruende ---
 let bgCacheCanvas = null;
 let bgCacheCtx = null;
@@ -93,6 +106,22 @@ function renderBgCache(stage) {
 
 export function updateBackground(dt) {
     const vert = isVertical();
+    const stage = getStage(state.stageIndex);
+
+    // === SCROLLING BACKGROUND IMAGE ===
+    if (stage.backgroundImage) {
+        const bgSpeed = 30; // Langsame Scroll-Geschwindigkeit fuer Hintergrund-Bild
+        if (vert) {
+            bgImageOffsetY += bgSpeed * dt;
+        } else {
+            bgImageOffset += bgSpeed * dt;
+        }
+        bgImageKey = stage.backgroundImage;
+    } else {
+        bgImageOffset = 0;
+        bgImageOffsetY = 0;
+        bgImageKey = null;
+    }
 
     // Deep Stars: sehr langsam
     for (const star of deepStars) {
@@ -174,6 +203,9 @@ export function drawBackground(ctx) {
     ensureBgCache();
     ctx.drawImage(bgCacheCanvas, 0, 0);
 
+    // === SCROLLING BACKGROUND IMAGE (zwischen Gradient und Parallax) ===
+    drawScrollingBackgroundImage(ctx, stage);
+
     // === PARALLAX LAYERS (von hinten nach vorne) ===
 
     // Layer 0: Nebel-Wolken (am weitesten hinten, sehr subtil)
@@ -190,6 +222,59 @@ export function drawBackground(ctx) {
 
     // Layer 4: Parallax Objects (am naechsten)
     drawParallaxObjects(ctx, stage);
+}
+
+// === SCROLLING BACKGROUND IMAGE RENDERER ===
+// Zeichnet ein Hintergrund-Bild das langsam scrollt, mit semi-transparenter
+// Ueberlagerung damit die Parallax-Animationen darueber sichtbar bleiben.
+function drawScrollingBackgroundImage(ctx, stage) {
+    if (!stage.backgroundImage) return;
+
+    const img = assets.get(stage.backgroundImage);
+    if (!img) return;
+
+    const vert = isVertical();
+
+    ctx.save();
+
+    // Bild mit reduzierter Deckkraft zeichnen damit Parallax-Layer sichtbar bleiben
+    ctx.globalAlpha = stage.bgImageAlpha || 0.25;
+
+    if (vert) {
+        // Vertikal scrollen: Bild laeuft von oben nach unten
+        const imgW = CONFIG.width;
+        const imgH = (img.height / img.width) * imgW;
+        const totalH = imgH * 2; // 2 Kacheln fuer nahtloses Scrollen
+
+        // Offset zuruecksetzen wenn eine Kachel durchlaufen
+        if (bgImageOffsetY >= imgH) {
+            bgImageOffsetY -= imgH;
+        }
+
+        const offsetY = bgImageOffsetY % imgH;
+
+        // Zwei Kacheln zeichnen fuer nahtloses Scrollen
+        ctx.drawImage(img, 0, -offsetY, imgW, imgH);
+        ctx.drawImage(img, 0, imgH - offsetY, imgW, imgH);
+    } else {
+        // Horizontal scrollen: Bild laeuft von rechts nach links
+        const imgH = CONFIG.height;
+        const imgW = (img.width / img.height) * imgH;
+        const totalW = imgW * 2; // 2 Kacheln fuer nahtloses Scrollen
+
+        // Offset zuruecksetzen wenn eine Kachel durchlaufen
+        if (bgImageOffset >= imgW) {
+            bgImageOffset -= imgW;
+        }
+
+        const offsetX = bgImageOffset % imgW;
+
+        // Zwei Kacheln zeichnen fuer nahtloses Scrollen
+        ctx.drawImage(img, -offsetX, 0, imgW, imgH);
+        ctx.drawImage(img, imgW - offsetX, 0, imgW, imgH);
+    }
+
+    ctx.restore();
 }
 
 function drawDeepStars(ctx, stage) {

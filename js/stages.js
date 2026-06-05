@@ -3,6 +3,8 @@ export const stages = [
         id: 1,
         name: 'Orbital Frontier',
         scrollDirection: 'horizontal',
+        backgroundImage: 'bgCity01',
+        bgImageAlpha: 0.2,
         colors: {
             top: '#020617',
             mid: '#061029',
@@ -16,6 +18,8 @@ export const stages = [
         id: 2,
         name: 'Asteroid Graveyard',
         scrollDirection: 'horizontal',
+        backgroundImage: 'bgCity02',
+        bgImageAlpha: 0.15,
         colors: {
             top: '#1a0f07',
             mid: '#2a1208',
@@ -29,6 +33,8 @@ export const stages = [
         id: 3,
         name: 'Cyber Grid',
         scrollDirection: 'horizontal',
+        backgroundImage: 'bgCity01',
+        bgImageAlpha: 0.25,
         colors: {
             top: '#070b1c',
             mid: '#111827',
@@ -42,6 +48,8 @@ export const stages = [
         id: 4,
         name: 'Ruined Station',
         scrollDirection: 'horizontal',
+        backgroundImage: 'bgCity02',
+        bgImageAlpha: 0.2,
         colors: {
             top: '#111827',
             mid: '#1f2937',
@@ -55,6 +63,8 @@ export const stages = [
         id: 5,
         name: 'Nebula Rift',
         scrollDirection: 'horizontal',
+        backgroundImage: 'bgCity01',
+        bgImageAlpha: 0.18,
         colors: {
             top: '#160f29',
             mid: '#312e81',
@@ -68,6 +78,8 @@ export const stages = [
         id: 6,
         name: 'Alien Hive',
         scrollDirection: 'horizontal',
+        backgroundImage: 'bgCity02',
+        bgImageAlpha: 0.22,
         colors: {
             top: '#052e16',
             mid: '#14532d',
@@ -81,6 +93,8 @@ export const stages = [
         id: 7,
         name: 'Machine Core',
         scrollDirection: 'horizontal',
+        backgroundImage: 'bgCity01',
+        bgImageAlpha: 0.28,
         colors: {
             top: '#0f172a',
             mid: '#334155',
@@ -94,6 +108,8 @@ export const stages = [
         id: 8,
         name: 'Solar Inferno',
         scrollDirection: 'horizontal',
+        backgroundImage: 'bgCity02',
+        bgImageAlpha: 0.18,
         colors: {
             top: '#431407',
             mid: '#7c2d12',
@@ -107,6 +123,8 @@ export const stages = [
         id: 9,
         name: 'Void Sector',
         scrollDirection: 'horizontal',
+        backgroundImage: 'bgCity01',
+        bgImageAlpha: 0.12,
         colors: {
             top: '#020617',
             mid: '#09090b',
@@ -120,6 +138,8 @@ export const stages = [
         id: 10,
         name: 'Omega Citadel',
         scrollDirection: 'horizontal',
+        backgroundImage: 'bgCity02',
+        bgImageAlpha: 0.25,
         colors: {
             top: '#190019',
             mid: '#3b0764',
@@ -134,6 +154,8 @@ export const stages = [
         id: 11,
         name: 'Pacific Storm',
         scrollDirection: 'horizontal', // Wird von getScrollDirection() überschrieben
+        backgroundImage: 'bgCity01',
+        bgImageAlpha: 0.2,
         colors: {
             top: '#071a3e',
             mid: '#0c2d5e',
@@ -147,6 +169,8 @@ export const stages = [
         id: 12,
         name: 'Island Fortress',
         scrollDirection: 'horizontal',
+        backgroundImage: 'bgCity02',
+        bgImageAlpha: 0.18,
         colors: {
             top: '#0a2e1a',
             mid: '#14532d',
@@ -160,6 +184,8 @@ export const stages = [
         id: 13,
         name: 'Dogfight Alley',
         scrollDirection: 'horizontal',
+        backgroundImage: 'bgCity01',
+        bgImageAlpha: 0.22,
         colors: {
             top: '#2a1208',
             mid: '#7c2d12',
@@ -173,6 +199,8 @@ export const stages = [
         id: 14,
         name: 'Carrier Assault',
         scrollDirection: 'horizontal',
+        backgroundImage: 'bgCity02',
+        bgImageAlpha: 0.2,
         colors: {
             top: '#1a0a2e',
             mid: '#3b0764',
@@ -186,6 +214,8 @@ export const stages = [
         id: 15,
         name: 'Final Intercept',
         scrollDirection: 'horizontal',
+        backgroundImage: 'bgCity01',
+        bgImageAlpha: 0.25,
         colors: {
             top: '#2e0a0a',
             mid: '#7f1d1d',
