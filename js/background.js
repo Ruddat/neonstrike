@@ -1,10 +1,15 @@
 import { CONFIG } from './config.js';
 import { state } from './state.js';
 import { getStage } from './stages.js';
+import {
+    isVertical,
+    bgScrollX, bgScrollY,
+    bgWrapX, bgWrapY,
+    bgWrapXSimple, bgWrapYSimple,
+} from './direction.js';
 
 // ============================================================
-// MULTI-LAYER PARALLAX BACKGROUND
-// 3 Sternen-Layer (deep, mid, near) + Nebel-Wolken + Objekte
+// MULTI-LAYER PARALLAX BACKGROUND (direction-aware)
 // ============================================================
 
 // Layer 1: Deep Stars (am langsamsten, am kleinsten)
@@ -87,51 +92,72 @@ function renderBgCache(stage) {
 }
 
 export function updateBackground(dt) {
+    const vert = isVertical();
+
     // Deep Stars: sehr langsam
     for (const star of deepStars) {
-        star.x -= 15 * dt;
-        if (star.x < -5) {
-            star.x = CONFIG.width + Math.random() * 40;
-            star.y = Math.random() * CONFIG.height;
+        star.x += bgScrollX(15, dt);
+        star.y += bgScrollY(15, dt);
+        if (!bgWrapXSimple(star, 5)) {
+            bgWrapYSimple(star, 5);
         }
     }
 
     // Mid Stars: mittlere Geschwindigkeit
     for (const star of midStars) {
-        star.x -= star.z * 50 * dt;
-        if (star.x < -10) {
-            star.x = CONFIG.width + Math.random() * 60;
-            star.y = Math.random() * CONFIG.height;
+        star.x += bgScrollX(star.z * 50, dt);
+        star.y += bgScrollY(star.z * 50, dt);
+        if (!bgWrapXSimple(star, 10)) {
+            bgWrapYSimple(star, 10);
         }
     }
 
     // Near Stars: schnell
     for (const star of nearStars) {
-        star.x -= star.z * 90 * dt;
-        if (star.x < -15) {
-            star.x = CONFIG.width + Math.random() * 100;
-            star.y = Math.random() * CONFIG.height;
+        star.x += bgScrollX(star.z * 90, dt);
+        star.y += bgScrollY(star.z * 90, dt);
+        if (!bgWrapXSimple(star, 15)) {
+            bgWrapYSimple(star, 15);
         }
     }
 
     // Nebel-Wolken: sehr langsam scrollen
     for (const cloud of nebulaClouds) {
-        cloud.x -= cloud.speed * dt;
-        if (cloud.x < -cloud.w - 50) {
-            cloud.x = CONFIG.width + Math.random() * 200;
-            cloud.y = 60 + Math.random() * (CONFIG.height - 120);
-            cloud.w = 200 + Math.random() * 350;
-            cloud.h = 100 + Math.random() * 180;
+        cloud.x += bgScrollX(cloud.speed, dt);
+        cloud.y += bgScrollY(cloud.speed, dt);
+        if (vert) {
+            if (cloud.y > CONFIG.height + cloud.h + 50) {
+                cloud.y = -cloud.h - Math.random() * 200;
+                cloud.x = Math.random() * CONFIG.width;
+                cloud.w = 200 + Math.random() * 350;
+                cloud.h = 100 + Math.random() * 180;
+            }
+        } else {
+            if (cloud.x < -cloud.w - 50) {
+                cloud.x = CONFIG.width + Math.random() * 200;
+                cloud.y = 60 + Math.random() * (CONFIG.height - 120);
+                cloud.w = 200 + Math.random() * 350;
+                cloud.h = 100 + Math.random() * 180;
+            }
         }
     }
 
     // Parallax Foreground Objects
     for (const obj of parallaxObjects) {
-        obj.x -= obj.speed * dt;
-        if (obj.x < -obj.size - 80) {
-            obj.x = CONFIG.width + Math.random() * 300;
-            obj.y = 80 + Math.random() * (CONFIG.height - 160);
-            obj.size = 30 + Math.random() * 90;
+        obj.x += bgScrollX(obj.speed, dt);
+        obj.y += bgScrollY(obj.speed, dt);
+        if (vert) {
+            if (obj.y > CONFIG.height + obj.size + 80) {
+                obj.y = -obj.size - Math.random() * 100;
+                obj.x = Math.random() * CONFIG.width;
+                obj.size = 30 + Math.random() * 90;
+            }
+        } else {
+            if (obj.x < -obj.size - 80) {
+                obj.x = CONFIG.width + Math.random() * 300;
+                obj.y = 80 + Math.random() * (CONFIG.height - 160);
+                obj.size = 30 + Math.random() * 90;
+            }
         }
     }
 }
@@ -191,7 +217,6 @@ function drawNearStars(ctx, stage) {
     for (const star of nearStars) {
         ctx.globalAlpha = star.brightness + 0.15;
 
-        // Nahe Sterne haben einen leichten Glow
         ctx.fillStyle = star.z > 3.5 ? '#ffffff' : accent;
         ctx.fillRect(star.x, star.y, star.r * star.z * 0.4, star.r);
 
@@ -253,6 +278,12 @@ function drawStageDecoration(ctx, stage) {
     if (stage.id === 8) drawSolarGlow(ctx);
     if (stage.id === 9) drawVoid(ctx);
     if (stage.id === 10) drawCitadel(ctx);
+    // Vertical stages
+    if (stage.id === 11) drawOcean(ctx);
+    if (stage.id === 12) drawIslandBase(ctx);
+    if (stage.id === 13) drawDogfight(ctx);
+    if (stage.id === 14) drawCarrier(ctx);
+    if (stage.id === 15) drawFinalIntercept(ctx);
 }
 
 function drawPlanet(ctx, color) {
@@ -367,6 +398,87 @@ function drawCitadel(ctx) {
     }
 }
 
+// --- Vertical Stage Decorations (1945-Style) ---
+
+function drawOcean(ctx) {
+    // Ozean-Wellen am unteren Rand
+    ctx.strokeStyle = 'rgba(56, 189, 248, .12)';
+    ctx.lineWidth = 1;
+    for (let y = CONFIG.height * 0.6; y < CONFIG.height; y += 30) {
+        ctx.beginPath();
+        for (let x = 0; x < CONFIG.width; x += 5) {
+            const wave = Math.sin(x * 0.02 + y * 0.1) * 8;
+            if (x === 0) ctx.moveTo(x, y + wave);
+            else ctx.lineTo(x, y + wave);
+        }
+        ctx.stroke();
+    }
+}
+
+function drawIslandBase(ctx) {
+    // Insel-Silhouetten
+    ctx.fillStyle = 'rgba(20, 83, 45, .2)';
+    for (let i = 0; i < 4; i++) {
+        const x = 100 + i * 300;
+        const h = 40 + i * 20;
+        ctx.beginPath();
+        ctx.moveTo(x - 80, CONFIG.height);
+        ctx.lineTo(x - 40, CONFIG.height - h);
+        ctx.lineTo(x + 20, CONFIG.height - h - 20);
+        ctx.lineTo(x + 80, CONFIG.height - h + 10);
+        ctx.lineTo(x + 100, CONFIG.height);
+        ctx.closePath();
+        ctx.fill();
+    }
+}
+
+function drawDogfight(ctx) {
+    // Wolken-Felder
+    ctx.fillStyle = 'rgba(148, 163, 184, .08)';
+    for (let i = 0; i < 6; i++) {
+        const x = (i * 237 + 100) % CONFIG.width;
+        const y = (i * 183 + 80) % CONFIG.height;
+        ctx.beginPath();
+        ctx.ellipse(x, y, 80 + i * 20, 40 + i * 10, 0.3, 0, Math.PI * 2);
+        ctx.fill();
+    }
+}
+
+function drawCarrier(ctx) {
+    // Flugzeugtraeger-Struktur
+    ctx.strokeStyle = 'rgba(168, 85, 247, .15)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(CONFIG.width * 0.3, CONFIG.height);
+    ctx.lineTo(CONFIG.width * 0.3, CONFIG.height - 60);
+    ctx.lineTo(CONFIG.width * 0.7, CONFIG.height - 60);
+    ctx.lineTo(CONFIG.width * 0.7, CONFIG.height);
+    ctx.stroke();
+
+    ctx.fillStyle = 'rgba(168, 85, 247, .08)';
+    ctx.fillRect(CONFIG.width * 0.3, CONFIG.height - 60, CONFIG.width * 0.4, 60);
+}
+
+function drawFinalIntercept(ctx) {
+    // Rote Alarm-Glow
+    const g = ctx.createRadialGradient(CONFIG.width / 2, CONFIG.height / 2, 0, CONFIG.width / 2, CONFIG.height / 2, 500);
+    g.addColorStop(0, 'rgba(239, 68, 68, .15)');
+    g.addColorStop(0.5, 'rgba(239, 68, 68, .05)');
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, CONFIG.width, CONFIG.height);
+
+    // Kreuz-Fadenkreuz
+    ctx.strokeStyle = 'rgba(239, 68, 68, .1)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(CONFIG.width / 2, 0);
+    ctx.lineTo(CONFIG.width / 2, CONFIG.height);
+    ctx.moveTo(0, CONFIG.height / 2);
+    ctx.lineTo(CONFIG.width, CONFIG.height / 2);
+    ctx.stroke();
+}
+
 
 function drawParallaxObjects(ctx, stage) {
     for (const obj of parallaxObjects) {
@@ -379,6 +491,9 @@ function drawParallaxObjects(ctx, stage) {
             drawDebrisObject(ctx, obj);
         } else if (stage.id === 7 || stage.id === 10) {
             drawTechObject(ctx, obj);
+        } else if (stage.id >= 11 && stage.id <= 15) {
+            // Vertical stages: different parallax objects
+            drawVerticalParallaxObject(ctx, obj, stage);
         } else {
             drawSpaceDustObject(ctx, obj, stage);
         }
@@ -435,6 +550,26 @@ function drawTechObject(ctx, obj) {
     ctx.moveTo(0, -obj.size / 3);
     ctx.lineTo(0, obj.size / 3);
     ctx.stroke();
+}
+
+function drawVerticalParallaxObject(ctx, obj, stage) {
+    // Verschiedene Objekte fuer vertikale Level
+    if (stage.id === 11) {
+        // Ozean: Blasen
+        ctx.fillStyle = 'rgba(56, 189, 248, 0.15)';
+        ctx.beginPath();
+        ctx.arc(obj.x, obj.y, obj.size * 0.15, 0, Math.PI * 2);
+        ctx.fill();
+    } else if (stage.id === 13) {
+        // Dogfight: Rauchwolken
+        ctx.fillStyle = 'rgba(148, 163, 184, 0.1)';
+        ctx.beginPath();
+        ctx.ellipse(obj.x, obj.y, obj.size * 0.6, obj.size * 0.3, 0, 0, Math.PI * 2);
+        ctx.fill();
+    } else {
+        // Default: Weltraum-Staub
+        drawSpaceDustObject(ctx, obj, stage);
+    }
 }
 
 function drawSpaceDustObject(ctx, obj, stage) {

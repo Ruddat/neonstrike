@@ -2,6 +2,7 @@ import { CONFIG } from './config.js';
 import { state } from './state.js';
 import { clamp } from './utils.js';
 import { audio } from './audio.js';
+import { isVertical, isPowerupOutOfBounds } from './direction.js';
 
 
 const TYPES = ['spread', 'plasma', 'rapid', 'shield', 'life', 'railgun', 'weaponUp', 'bomb'];
@@ -45,10 +46,16 @@ export function updatePowerups(dt) {
         const p = state.powerups[i];
 
         p.t += dt;
-        p.x -= p.speed * dt;
-        p.y += Math.sin(p.t * 5) * 0.55;
+        // Richtungabhaengige Drift
+        if (isVertical()) {
+            p.y += p.speed * dt;
+            p.x += Math.sin(p.t * 5) * 0.55;
+        } else {
+            p.x -= p.speed * dt;
+            p.y += Math.sin(p.t * 5) * 0.55;
+        }
 
-        if (p.x < -40) {
+        if (isPowerupOutOfBounds(p)) {
             state.powerups.splice(i, 1);
             continue;
         }
@@ -163,8 +170,6 @@ export function drawPowerups(ctx) {
         ctx.rotate(p.t * 2.4);
 
         // Glow via semi-transparente Kreise statt shadowBlur
-        ctx.fillStyle = color.replace(')', ', 0.15)').replace('#', 'rgba(');
-        // Einfache hex-to-rgba Umwandlung
         const r = parseInt(color.slice(1,3), 16);
         const g = parseInt(color.slice(3,5), 16);
         const b = parseInt(color.slice(5,7), 16);

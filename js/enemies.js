@@ -2,6 +2,14 @@ import { CONFIG } from './config.js';
 import { state } from './state.js';
 import { assets } from './assets.js';
 import { getStage } from './stages.js';
+import {
+    isVertical,
+    spawnX, spawnY,
+    formationSpawnX, formationSpawnY,
+    moveX, isOutOfBounds,
+    enemyBulletBaseVx, enemyBulletBaseVy,
+    bossBulletX, bossBulletY,
+} from './direction.js';
 
 let spawnTimer = 0;
 
@@ -45,7 +53,11 @@ export function updateEnemies(dt) {
         // Enemy Shooting
         enemy.fireTimer -= dt;
 
-        if (enemy.fireTimer <= 0 && enemy.x < CONFIG.width - 90 && enemy.type !== 'kamikaze' && enemy.type !== 'wobble') {
+        const canFire = isVertical()
+            ? enemy.y > -90 && enemy.type !== 'kamikaze' && enemy.type !== 'wobble'
+            : enemy.x < CONFIG.width - 90 && enemy.type !== 'kamikaze' && enemy.type !== 'wobble';
+
+        if (enemy.fireTimer <= 0 && canFire) {
             fireEnemyBullet(enemy, speedMul);
         }
 
@@ -74,6 +86,9 @@ export function updateEnemies(dt) {
             if (enemy.y < 60 || enemy.y > CONFIG.height - 60) {
                 enemy.vy *= -1;
             }
+            if (enemy.x < 60 || enemy.x > CONFIG.width - 60) {
+                enemy.vx *= -1;
+            }
         }
 
         // Drunk: Zigzag movement
@@ -83,18 +98,29 @@ export function updateEnemies(dt) {
                 enemy.drinkDir *= -1;
                 enemy.drinkDirTimer = 0.4 + Math.random() * 0.6;
             }
-            enemy.x -= enemy.speed * dt;
-            enemy.y += enemy.drinkDir * 180 * dt;
-            enemy.y = Math.max(40, Math.min(CONFIG.height - 40, enemy.y));
+            if (isVertical()) {
+                enemy.y += enemy.speed * dt;
+                enemy.x += enemy.drinkDir * 180 * dt;
+                enemy.x = Math.max(40, Math.min(CONFIG.width - 40, enemy.x));
+            } else {
+                enemy.x -= enemy.speed * dt;
+                enemy.y += enemy.drinkDir * 180 * dt;
+                enemy.y = Math.max(40, Math.min(CONFIG.height - 40, enemy.y));
+            }
         }
 
         // Wobble: Slow drifting movement
         if (enemy.type === 'wobble') {
-            enemy.x -= enemy.speed * dt;
-            enemy.y = enemy.baseY + Math.sin(enemy.t * 1.5) * enemy.wave;
+            if (isVertical()) {
+                enemy.y += enemy.speed * dt;
+                enemy.x = enemy.baseX + Math.sin(enemy.t * 1.5) * enemy.wave;
+            } else {
+                enemy.x -= enemy.speed * dt;
+                enemy.y = enemy.baseY + Math.sin(enemy.t * 1.5) * enemy.wave;
+            }
         }
 
-        if (enemy.x < -120 || enemy.x > CONFIG.width + 120) {
+        if (isOutOfBounds(enemy)) {
             state.enemies.splice(i, 1);
         }
     }
@@ -110,14 +136,24 @@ function updateEnemyMovement(enemy, dt, speedMul) {
 
     // Derp: Wobble movement (high frequency sine)
     if (enemy.type === 'derp') {
-        enemy.x -= enemy.speed * dt;
-        enemy.y = enemy.baseY + Math.sin(enemy.t * 8) * 30;
+        if (isVertical()) {
+            enemy.y += enemy.speed * dt;
+            enemy.x = enemy.baseX + Math.sin(enemy.t * 8) * 30;
+        } else {
+            enemy.x -= enemy.speed * dt;
+            enemy.y = enemy.baseY + Math.sin(enemy.t * 8) * 30;
+        }
         return;
     }
 
-    // Standard-Bewegung: Links + Welle
-    enemy.x -= enemy.speed * dt;
-    enemy.y = enemy.baseY + Math.sin(enemy.t * 3.1) * enemy.wave;
+    // Standard-Bewegung: Hauptrichtung + Welle
+    if (isVertical()) {
+        enemy.y += enemy.speed * dt;
+        enemy.x = enemy.baseX + Math.sin(enemy.t * 3.1) * enemy.wave;
+    } else {
+        enemy.x -= enemy.speed * dt;
+        enemy.y = enemy.baseY + Math.sin(enemy.t * 3.1) * enemy.wave;
+    }
 }
 
 function fireEnemyBullet(enemy, speedMul) {
@@ -127,8 +163,8 @@ function fireEnemyBullet(enemy, speedMul) {
         const dy = state.player.y - enemy.y;
         const len = Math.hypot(dx, dy) || 1;
         state.enemyBullets.push({
-            x: enemy.x - 32,
-            y: enemy.y,
+            x: isVertical() ? enemy.x : enemy.x - 32,
+            y: isVertical() ? enemy.y + 32 : enemy.y,
             vx: (dx / len) * 380 * speedMul,
             vy: (dy / len) * 380 * speedMul,
             r: 6,
@@ -139,23 +175,25 @@ function fireEnemyBullet(enemy, speedMul) {
         // Heavy: Triple Shot
         for (let i = -1; i <= 1; i++) {
             state.enemyBullets.push({
-                x: enemy.x - 32,
-                y: enemy.y + i * 18,
-                vx: -310 * speedMul,
-                vy: i * 50 * speedMul,
+                x: isVertical() ? enemy.x + i * 18 : enemy.x - 32,
+                y: isVertical() ? enemy.y + 32 : enemy.y + i * 18,
+                vx: enemyBulletBaseVx(speedMul) + (isVertical() ? i * 50 * speedMul : 0),
+                vy: enemyBulletBaseVy(speedMul) + (isVertical() ? 0 : i * 50 * speedMul),
                 r: 6,
             });
         }
         enemy.fireTimer = 1.4;
     } else if (enemy.type === 'derp') {
         // Derp: Inaccurate shots with random spread
-        const baseAngle = Math.PI + (Math.random() - 0.5) * 1.2; // Wide spread
+        const baseAngle = isVertical()
+            ? Math.PI / 2 + (Math.random() - 0.5) * 1.2  // Nach unten
+            : Math.PI + (Math.random() - 0.5) * 1.2;       // Nach links
         for (let i = 0; i < 2; i++) {
             const spread = (Math.random() - 0.5) * 0.8;
             const angle = baseAngle + spread;
             state.enemyBullets.push({
-                x: enemy.x - 20,
-                y: enemy.y,
+                x: isVertical() ? enemy.x : enemy.x - 20,
+                y: isVertical() ? enemy.y + 20 : enemy.y,
                 vx: Math.cos(angle) * 260 * speedMul,
                 vy: Math.sin(angle) * 260 * speedMul,
                 r: 4,
@@ -165,13 +203,15 @@ function fireEnemyBullet(enemy, speedMul) {
         enemy.fireTimer = 1.8 + Math.random() * 0.5;
     } else if (enemy.type === 'drunk') {
         // Drunk: Random direction shots, sometimes backwards!
-        const backwards = Math.random() < 0.3; // 30% chance to shoot backwards
+        const backwards = Math.random() < 0.3;
         const baseAngle = backwards
-            ? (Math.random() - 0.5) * 1.5 // Forwards-ish but wild
-            : Math.PI + (Math.random() - 0.5) * 2.0; // Random direction
+            ? (Math.random() - 0.5) * 1.5
+            : isVertical()
+                ? Math.PI / 2 + (Math.random() - 0.5) * 2.0
+                : Math.PI + (Math.random() - 0.5) * 2.0;
         state.enemyBullets.push({
-            x: backwards ? enemy.x + 20 : enemy.x - 20,
-            y: enemy.y,
+            x: isVertical() ? (backwards ? enemy.x : enemy.x) : (backwards ? enemy.x + 20 : enemy.x - 20),
+            y: isVertical() ? (backwards ? enemy.y - 20 : enemy.y + 20) : enemy.y,
             vx: Math.cos(baseAngle) * 280 * speedMul,
             vy: Math.sin(baseAngle) * 280 * speedMul,
             r: 5,
@@ -181,17 +221,17 @@ function fireEnemyBullet(enemy, speedMul) {
     } else {
         // Drone: Standard
         state.enemyBullets.push({
-            x: enemy.x - 32,
-            y: enemy.y,
-            vx: -310 * speedMul,
-            vy: Math.sin(enemy.t * 2) * 70 * speedMul,
+            x: isVertical() ? enemy.x : enemy.x - 32,
+            y: isVertical() ? enemy.y + 32 : enemy.y,
+            vx: enemyBulletBaseVx(speedMul),
+            vy: enemyBulletBaseVy(speedMul) + (isVertical() ? 0 : Math.sin(enemy.t * 2) * 70 * speedMul),
             r: 5,
         });
         enemy.fireTimer = 2.1;
     }
 }
 
-// --- Formation Spawning (Katakis-Style) ---
+// --- Formation Spawning (Katakis-Style, direction-aware) ---
 
 function spawnFormation(speedMul) {
     const formType = state.formationWave % 9;
@@ -212,16 +252,23 @@ function spawnFormation(speedMul) {
 function spawnVFormation(speedMul) {
     const stage = getStage(state.stageIndex);
     const hpBonus = stage.enemyHpBonus || 0;
-    const baseY = 100 + Math.random() * (CONFIG.height - 200);
+    const vert = isVertical();
     const count = 5 + Math.floor(state.stageIndex * 0.5);
+
+    // Basisposition: horizontal = Y, vertical = X
+    const base = vert
+        ? 100 + Math.random() * (CONFIG.width - 200)
+        : 100 + Math.random() * (CONFIG.height - 200);
 
     for (let i = 0; i < count; i++) {
         const row = Math.abs(i - Math.floor(count / 2));
+        const offset = i - Math.floor(count / 2);
         state.enemies.push({
             type: 'drone',
-            x: CONFIG.width + 80 + row * 50,
-            y: baseY + (i - Math.floor(count / 2)) * 40,
-            baseY: baseY + (i - Math.floor(count / 2)) * 40,
+            x: vert ? base + offset * 40 : formationSpawnX(row),
+            y: vert ? formationSpawnY(0, row * 50) : base + offset * 40,
+            baseX: vert ? base + offset * 40 : undefined,
+            baseY: vert ? undefined : base + offset * 40,
             w: 52,
             h: 30,
             speed: (170 + Math.random() * 40) * speedMul,
@@ -237,15 +284,22 @@ function spawnVFormation(speedMul) {
 function spawnLineFormation(speedMul) {
     const stage = getStage(state.stageIndex);
     const hpBonus = stage.enemyHpBonus || 0;
-    const y = 70 + Math.random() * (CONFIG.height - 140);
+    const vert = isVertical();
     const count = 6 + Math.floor(state.stageIndex * 0.3);
+
+    // Bei vertikal: Linie entlang X, spawn oben
+    // Bei horizontal: Linie entlang Y, spawn rechts
+    const base = vert
+        ? 100 + Math.random() * (CONFIG.width - 200)
+        : 70 + Math.random() * (CONFIG.height - 140);
 
     for (let i = 0; i < count; i++) {
         state.enemies.push({
             type: 'drone',
-            x: CONFIG.width + 80 + i * 65,
-            y: y,
-            baseY: y,
+            x: vert ? base : formationSpawnX(i),
+            y: vert ? formationSpawnY(0, i * 50) : base,
+            baseX: vert ? base : undefined,
+            baseY: vert ? undefined : base,
             w: 52,
             h: 30,
             speed: (185 + Math.random() * 30) * speedMul,
@@ -261,8 +315,9 @@ function spawnLineFormation(speedMul) {
 function spawnCircleFormation(speedMul) {
     const stage = getStage(state.stageIndex);
     const hpBonus = stage.enemyHpBonus || 0;
-    const cx = CONFIG.width + 160;
-    const cy = CONFIG.height / 2;
+    const vert = isVertical();
+    const cx = vert ? CONFIG.width / 2 : CONFIG.width + 160;
+    const cy = vert ? -160 : CONFIG.height / 2;
     const count = 8;
     const radius = 120;
 
@@ -275,7 +330,8 @@ function spawnCircleFormation(speedMul) {
             type: i % 3 === 0 ? 'heavy' : 'drone',
             x: ex,
             y: ey,
-            baseY: ey,
+            baseX: vert ? ex : undefined,
+            baseY: vert ? undefined : ey,
             w: i % 3 === 0 ? 76 : 52,
             h: i % 3 === 0 ? 44 : 30,
             speed: (140 + Math.random() * 30) * speedMul,
@@ -291,13 +347,15 @@ function spawnCircleFormation(speedMul) {
 function spawnFlankerPair(speedMul) {
     const stage = getStage(state.stageIndex);
     const hpBonus = stage.enemyHpBonus || 0;
-    // Zwei Flanker kommen von oben und unten
+    const vert = isVertical();
+    // Zwei Flanker kommen von links und rechts (vertikal) oder oben und unten (horizontal)
     for (const dir of [-1, 1]) {
         state.enemies.push({
             type: 'flanker',
-            x: CONFIG.width + 80,
-            y: dir === -1 ? 80 : CONFIG.height - 80,
-            baseY: dir === -1 ? 80 : CONFIG.height - 80,
+            x: vert ? (dir === -1 ? 80 : CONFIG.width - 80) : CONFIG.width + 80,
+            y: vert ? -80 : (dir === -1 ? 80 : CONFIG.height - 80),
+            baseX: vert ? (dir === -1 ? 80 : CONFIG.width - 80) : undefined,
+            baseY: vert ? undefined : (dir === -1 ? 80 : CONFIG.height - 80),
             w: 48,
             h: 32,
             speed: 220 * speedMul,
@@ -306,8 +364,8 @@ function spawnFlankerPair(speedMul) {
             wave: 0,
             t: 0,
             fireTimer: 0.8,
-            vx: -200 * speedMul,
-            vy: dir * 160 * speedMul,
+            vx: vert ? dir * 160 * speedMul : -200 * speedMul,
+            vy: vert ? 200 * speedMul : dir * 160 * speedMul,
         });
     }
 }
@@ -315,15 +373,19 @@ function spawnFlankerPair(speedMul) {
 function spawnKamikazeWave(speedMul) {
     const stage = getStage(state.stageIndex);
     const hpBonus = stage.enemyHpBonus || 0;
+    const vert = isVertical();
     const count = 2 + Math.floor(state.stageIndex * 0.3);
 
     for (let i = 0; i < count; i++) {
-        const y = 100 + Math.random() * (CONFIG.height - 200);
+        const pos = vert
+            ? 100 + Math.random() * (CONFIG.width - 200)
+            : 100 + Math.random() * (CONFIG.height - 200);
         state.enemies.push({
             type: 'kamikaze',
-            x: CONFIG.width + 80 + i * 120,
-            y: y,
-            baseY: y,
+            x: vert ? pos : CONFIG.width + 80 + i * 120,
+            y: vert ? -80 - i * 120 : pos,
+            baseX: vert ? pos : undefined,
+            baseY: vert ? undefined : pos,
             w: 36,
             h: 36,
             speed: 0, // Wird durch vx/vy gesteuert
@@ -332,8 +394,8 @@ function spawnKamikazeWave(speedMul) {
             wave: 0,
             t: 0,
             fireTimer: 999, // Kein Schuss, nur Rammangriff
-            vx: -180 * speedMul,
-            vy: (Math.random() - 0.5) * 80,
+            vx: vert ? (Math.random() - 0.5) * 80 : -180 * speedMul,
+            vy: vert ? 180 * speedMul : (Math.random() - 0.5) * 80, // vertikal: nach unten, werden per Kamikaze-Tracking gelenkt
         });
     }
 }
@@ -341,15 +403,19 @@ function spawnKamikazeWave(speedMul) {
 function spawnSniperTeam(speedMul) {
     const stage = getStage(state.stageIndex);
     const hpBonus = stage.enemyHpBonus || 0;
+    const vert = isVertical();
     const count = 2 + Math.floor(state.stageIndex * 0.2);
 
     for (let i = 0; i < count; i++) {
-        const y = 120 + (CONFIG.height - 240) * (i / Math.max(1, count - 1));
+        const pos = vert
+            ? 120 + (CONFIG.width - 240) * (i / Math.max(1, count - 1))
+            : 120 + (CONFIG.height - 240) * (i / Math.max(1, count - 1));
         state.enemies.push({
             type: 'sniper',
-            x: CONFIG.width + 80,
-            y: y,
-            baseY: y,
+            x: vert ? pos : CONFIG.width + 80,
+            y: vert ? -80 : pos,
+            baseX: vert ? pos : undefined,
+            baseY: vert ? undefined : pos,
             w: 56,
             h: 28,
             speed: (90 + Math.random() * 30) * speedMul,
@@ -362,20 +428,25 @@ function spawnSniperTeam(speedMul) {
     }
 }
 
-// --- NEW SILLY/DERPY ENEMY SPAWNERS ---
+// --- SILLY/DERPY ENEMY SPAWNERS ---
 
 function spawnDerpWave(speedMul) {
     const stage = getStage(state.stageIndex);
     const hpBonus = stage.enemyHpBonus || 0;
+    const vert = isVertical();
     const count = 5 + Math.floor(state.stageIndex * 0.2);
-    const baseY = 80 + Math.random() * (CONFIG.height - 160);
+    const base = vert
+        ? 80 + Math.random() * (CONFIG.width - 160)
+        : 80 + Math.random() * (CONFIG.height - 160);
 
     for (let i = 0; i < count; i++) {
+        const offset = i - Math.floor(count / 2);
         state.enemies.push({
             type: 'derp',
-            x: CONFIG.width + 80 + i * 55,
-            y: baseY + (i - Math.floor(count / 2)) * 35,
-            baseY: baseY + (i - Math.floor(count / 2)) * 35,
+            x: vert ? base + offset * 35 : formationSpawnX(i * 0.8),
+            y: vert ? formationSpawnY(0, i * 50) : base + offset * 35,
+            baseX: vert ? base + offset * 35 : undefined,
+            baseY: vert ? undefined : base + offset * 35,
             w: 44,
             h: 44,
             speed: (120 + Math.random() * 40) * speedMul,
@@ -391,14 +462,18 @@ function spawnDerpWave(speedMul) {
 function spawnWobblePair(speedMul) {
     const stage = getStage(state.stageIndex);
     const hpBonus = stage.enemyHpBonus || 0;
+    const vert = isVertical();
 
     for (let i = 0; i < 2; i++) {
-        const y = 180 + i * (CONFIG.height - 360);
+        const pos = vert
+            ? 180 + i * (CONFIG.width - 360)
+            : 180 + i * (CONFIG.height - 360);
         state.enemies.push({
             type: 'wobble',
-            x: CONFIG.width + 80 + i * 100,
-            y: y,
-            baseY: y,
+            x: vert ? pos : CONFIG.width + 80 + i * 100,
+            y: vert ? -80 - i * 100 : pos,
+            baseX: vert ? pos : undefined,
+            baseY: vert ? undefined : pos,
             w: 64,
             h: 64,
             speed: (70 + Math.random() * 20) * speedMul,
@@ -414,16 +489,21 @@ function spawnWobblePair(speedMul) {
 function spawnDrunkSquad(speedMul) {
     const stage = getStage(state.stageIndex);
     const hpBonus = stage.enemyHpBonus || 0;
+    const vert = isVertical();
     const count = 3 + Math.floor(state.stageIndex * 0.2);
-    const baseY = 120 + Math.random() * (CONFIG.height - 240);
+    const base = vert
+        ? 120 + Math.random() * (CONFIG.width - 240)
+        : 120 + Math.random() * (CONFIG.height - 240);
 
     for (let i = 0; i < count; i++) {
         const dir = (i % 2 === 0) ? 1 : -1;
+        const offset = i - Math.floor(count / 2);
         state.enemies.push({
             type: 'drunk',
-            x: CONFIG.width + 80 + i * 70,
-            y: baseY + (i - Math.floor(count / 2)) * 50,
-            baseY: baseY + (i - Math.floor(count / 2)) * 50,
+            x: vert ? base + offset * 50 : CONFIG.width + 80 + i * 70,
+            y: vert ? -80 - i * 70 : base + offset * 50,
+            baseX: vert ? base + offset * 50 : undefined,
+            baseY: vert ? undefined : base + offset * 50,
             w: 52,
             h: 30,
             speed: (130 + Math.random() * 40) * speedMul,
@@ -457,13 +537,17 @@ function spawnSingleEnemy(speedMul) {
         type = 'drone';
     }
 
-    const y = 70 + Math.random() * (CONFIG.height - 140);
+    const vert = isVertical();
+    const pos = vert
+        ? 70 + Math.random() * (CONFIG.width - 140)
+        : 70 + Math.random() * (CONFIG.height - 140);
 
     const enemyData = {
         type,
-        x: CONFIG.width + 80,
-        y,
-        baseY: y,
+        x: vert ? pos : CONFIG.width + 80,
+        y: vert ? -80 : pos,
+        baseX: vert ? pos : undefined,
+        baseY: vert ? undefined : pos,
         w: type === 'heavy' ? 76 : type === 'wobble' ? 64 : type === 'derp' ? 44 : 52,
         h: type === 'heavy' ? 44 : type === 'wobble' ? 64 : type === 'derp' ? 44 : 30,
         speed: (type === 'heavy' ? 125 : type === 'wobble' ? 70 : type === 'derp' ? 120 : type === 'drunk' ? 130 : 190 + Math.random() * 55) * speedMul,
@@ -579,6 +663,11 @@ export function drawEnemies(ctx) {
             ctx.save();
             ctx.translate(enemy.x, enemy.y);
 
+            // Im vertikalen Modus: Gegner um 90° drehen (nach unten zeigen)
+            if (isVertical()) {
+                ctx.rotate(Math.PI / 2);
+            }
+
             // Glow via semi-transparente Form (ohne shadowBlur)
             ctx.fillStyle = enemy.type === 'heavy' ? 'rgba(249, 115, 22, 0.12)' : 'rgba(56, 189, 248, 0.1)';
             ctx.beginPath();
@@ -595,6 +684,11 @@ export function drawEnemies(ctx) {
         // Fallback
         ctx.save();
         ctx.translate(enemy.x, enemy.y);
+
+        // Im vertikalen Modus: Gegner um 90° drehen
+        if (isVertical()) {
+            ctx.rotate(Math.PI / 2);
+        }
 
         ctx.fillStyle = enemy.type === 'heavy' ? '#475569' : '#334155';
         ctx.strokeStyle = '#020617';
@@ -704,17 +798,21 @@ function drawSniper(ctx, enemy) {
     ctx.arc(8, 0, 8, 0, Math.PI * 2);
     ctx.stroke();
 
+    // Ziel-Strahl Richtung Spieler
     ctx.strokeStyle = 'rgba(250, 204, 21, .3)';
     ctx.lineWidth = 1;
+    const aimX = state.player.x - enemy.x;
+    const aimY = state.player.y - enemy.y;
+    const aimLen = Math.hypot(aimX, aimY) || 1;
     ctx.beginPath();
-    ctx.moveTo(-28, 0);
-    ctx.lineTo(-120, 0);
+    ctx.moveTo(28 * (aimX / aimLen), 28 * (aimY / aimLen));
+    ctx.lineTo(120 * (aimX / aimLen), 120 * (aimY / aimLen));
     ctx.stroke();
 
     ctx.restore();
 }
 
-// --- NEW SILLY/DERPY ENEMY DRAW FUNCTIONS ---
+// --- SILLY/DERPY ENEMY DRAW FUNCTIONS ---
 
 function drawDerp(ctx, enemy) {
     ctx.save();

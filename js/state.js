@@ -5,6 +5,7 @@ export const state = {
     gameOverShown: false,
     stageIndex: 0,
     maxLevel: 99,
+    scrollDirection: 'horizontal', // 'horizontal' oder 'vertical' (1945-Style)
     wave: 1,
 
     killsThisStage: 0,

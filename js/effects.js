@@ -1,6 +1,7 @@
 import { state } from './state.js';
 import { assets } from './assets.js';
 import { audio } from './audio.js';
+import { isVertical } from './direction.js';
 
 // Particle Types: explosion, debris, thrust, hitSpark, comboText
 
@@ -59,12 +60,13 @@ export function spawnDebris(x, y, size = 1) {
 }
 
 export function spawnThrustParticle(x, y) {
+    const vert = isVertical();
     state.particles.push({
         type: 'thrust',
-        x,
-        y: y + (Math.random() - 0.5) * 6,
-        vx: -100 - Math.random() * 60,
-        vy: (Math.random() - 0.5) * 20,
+        x: x + (vert ? (Math.random() - 0.5) * 6 : 0),
+        y: y + (vert ? 0 : (Math.random() - 0.5) * 6),
+        vx: vert ? (Math.random() - 0.5) * 20 : -100 - Math.random() * 60,
+        vy: vert ? 100 + Math.random() * 60 : (Math.random() - 0.5) * 20,
         size: 2 + Math.random() * 3,
         t: 0,
         duration: 0.1 + Math.random() * 0.06,

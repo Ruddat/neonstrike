@@ -5,6 +5,14 @@ import { audio } from './audio.js';
 import { maybeDropPowerup } from './powerups.js';
 import { assets } from './assets.js';
 import { spawnExplosion, spawnDebris } from './effects.js';
+import {
+    isVertical,
+    bossSpawnX, bossSpawnY,
+    bossTargetX, bossTargetY,
+    bossFlyInX, bossFlyInY,
+    bossMinX, bossMaxX, bossMinY, bossMaxY,
+    bossBulletX, bossBulletY,
+} from './direction.js';
 
 export function startBossWarning() {
     if (state.bossActive || state.bossWarning) return;
@@ -33,31 +41,52 @@ export function updateBoss(dt) {
 
     boss.t += dt;
 
-    // Einfliegen
-    if (boss.x > boss.targetX) {
-        boss.x -= 130 * dt;
-    }
+    // Einfliegen (richtungabhaengig)
+    bossFlyInX(boss, dt);
+    bossFlyInY(boss, dt);
 
     // Phase-basierte Bewegung
     if (boss.phase === 1) {
         // Sanftes Schwingen
-        boss.y = CONFIG.height / 2 + Math.sin(boss.t * 1.5) * 165;
+        if (isVertical()) {
+            boss.x = CONFIG.width / 2 + Math.sin(boss.t * 1.5) * 200;
+        } else {
+            boss.y = CONFIG.height / 2 + Math.sin(boss.t * 1.5) * 165;
+        }
     } else if (boss.phase === 2) {
         // Aggressivere Bewegung + Target Tracking
-        const targetY = state.player.y;
-        boss.y += (targetY - boss.y) * 0.8 * dt;
-        boss.y += Math.sin(boss.t * 2.5) * 120 * dt;
-        boss.y = Math.max(120, Math.min(CONFIG.height - 120, boss.y));
+        if (isVertical()) {
+            const targetX = state.player.x;
+            boss.x += (targetX - boss.x) * 0.8 * dt;
+            boss.x += Math.sin(boss.t * 2.5) * 120 * dt;
+            boss.x = Math.max(bossMinX(), Math.min(bossMaxX(), boss.x));
+        } else {
+            const targetY = state.player.y;
+            boss.y += (targetY - boss.y) * 0.8 * dt;
+            boss.y += Math.sin(boss.t * 2.5) * 120 * dt;
+            boss.y = Math.max(bossMinY(), Math.min(bossMaxY(), boss.y));
+        }
     } else if (boss.phase === 3) {
         // Rasante Bewegung + direkte Verfolgung
-        const targetY = state.player.y;
-        boss.y += (targetY - boss.y) * 1.5 * dt;
-        boss.y += Math.sin(boss.t * 4) * 80 * dt;
-        boss.y = Math.max(100, Math.min(CONFIG.height - 100, boss.y));
+        if (isVertical()) {
+            const targetX = state.player.x;
+            boss.x += (targetX - boss.x) * 1.5 * dt;
+            boss.x += Math.sin(boss.t * 4) * 80 * dt;
+            boss.x = Math.max(bossMinX(), Math.min(bossMaxX(), boss.x));
 
-        // Boss bewegt sich leicht nach links/rechts
-        boss.x += Math.sin(boss.t * 1.8) * 60 * dt;
-        boss.x = Math.max(CONFIG.width * 0.55, Math.min(CONFIG.width - 140, boss.x));
+            // Boss bewegt sich leicht nach oben/unten
+            boss.y += Math.sin(boss.t * 1.8) * 60 * dt;
+            boss.y = Math.max(bossMinY(), Math.min(bossMaxY(), boss.y));
+        } else {
+            const targetY = state.player.y;
+            boss.y += (targetY - boss.y) * 1.5 * dt;
+            boss.y += Math.sin(boss.t * 4) * 80 * dt;
+            boss.y = Math.max(bossMinY(), Math.min(bossMaxY(), boss.y));
+
+            // Boss bewegt sich leicht nach links/rechts
+            boss.x += Math.sin(boss.t * 1.8) * 60 * dt;
+            boss.x = Math.max(bossMinX(), Math.min(bossMaxX(), boss.x));
+        }
     }
 
     // Phase Transitions
@@ -66,7 +95,6 @@ export function updateBoss(dt) {
         boss.fireTimer = 0.5;
         state.screenFlash = 0.6;
         state.screenShake = 16;
-        // Minions spawnen bei Phase 2
         spawnBossMinions(2);
     }
     if (boss.hp < boss.maxHp * 0.33 && boss.phase === 2) {
@@ -74,7 +102,6 @@ export function updateBoss(dt) {
         boss.fireTimer = 0.3;
         state.screenFlash = 0.8;
         state.screenShake = 22;
-        // Mehr Minions bei Phase 3
         spawnBossMinions(3);
     }
 
@@ -110,9 +137,10 @@ function spawnBoss() {
 
     state.boss = {
         name: stage.bossName || 'Dread Cruiser',
-        x: CONFIG.width + 230,
-        y: CONFIG.height / 2,
-        targetX: CONFIG.width - 220,
+        x: bossSpawnX(),
+        y: bossSpawnY(),
+        targetX: bossTargetX(),
+        targetY: bossTargetY(),
         w: 260,
         h: 170,
         hp: baseHp,
@@ -131,11 +159,13 @@ function spawnBoss() {
 function spawnBossMinions(count) {
     for (let i = 0; i < count; i++) {
         const boss = state.boss;
+        const spawnRange = isVertical() ? 200 : 200;
         state.enemies.push({
             type: 'drone',
-            x: boss.x - 60 + Math.random() * 120,
-            y: boss.y + (Math.random() - 0.5) * 200,
-            baseY: boss.y + (Math.random() - 0.5) * 200,
+            x: boss.x + (isVertical() ? (Math.random() - 0.5) * spawnRange : -60 + Math.random() * 120),
+            y: boss.y + (isVertical() ? -60 + Math.random() * 120 : (Math.random() - 0.5) * spawnRange),
+            baseX: isVertical() ? boss.x + (Math.random() - 0.5) * spawnRange : undefined,
+            baseY: isVertical() ? undefined : boss.y + (Math.random() - 0.5) * spawnRange,
             w: 44,
             h: 26,
             speed: 140 + Math.random() * 40,
@@ -151,31 +181,34 @@ function spawnBossMinions(count) {
 
 function fireBossPattern(boss) {
     const patternVariant = Math.floor(boss.t * 3) % 4;
+    const bx = bossBulletX(boss);
+    const by = bossBulletY(boss);
+    const vert = isVertical();
 
     if (boss.phase === 1) {
         if (patternVariant === 0) {
             // Facher-Schuss
             for (let i = -2; i <= 2; i++) {
                 state.enemyBullets.push({
-                    x: boss.x - 120,
-                    y: boss.y + i * 24,
-                    vx: -340,
-                    vy: i * 32,
+                    x: vert ? bx + i * 24 : bx,
+                    y: vert ? by : by + i * 24,
+                    vx: vert ? i * 32 : -340,
+                    vy: vert ? 340 : i * 32,
                     r: 7,
                 });
             }
             boss.fireTimer = 1.15;
         } else if (patternVariant === 1) {
             // Gezielter Schuss Richtung Spieler
-            const dx = state.player.x - (boss.x - 120);
-            const dy = state.player.y - boss.y;
+            const dx = state.player.x - bx;
+            const dy = state.player.y - by;
             const len = Math.hypot(dx, dy) || 1;
             for (let i = -1; i <= 1; i++) {
                 state.enemyBullets.push({
-                    x: boss.x - 120,
-                    y: boss.y + i * 30,
-                    vx: (dx / len) * 360,
-                    vy: (dy / len) * 360 + i * 45,
+                    x: vert ? bx + i * 30 : bx,
+                    y: vert ? by : by + i * 30,
+                    vx: (dx / len) * 360 + (vert ? i * 45 : 0),
+                    vy: (dy / len) * 360 + (vert ? 0 : i * 45),
                     r: 6,
                 });
             }
@@ -184,23 +217,25 @@ function fireBossPattern(boss) {
             // Doppelreihe
             for (let i = -3; i <= 3; i++) {
                 state.enemyBullets.push({
-                    x: boss.x - 120 + (i % 2 === 0 ? 0 : 40),
-                    y: boss.y + i * 20,
-                    vx: -300,
-                    vy: i * 25,
+                    x: vert ? bx + i * 20 + (i % 2 === 0 ? 0 : 40) : bx + (i % 2 === 0 ? 0 : 40),
+                    y: vert ? by : by + i * 20 + (i % 2 === 0 ? 0 : 40),
+                    vx: vert ? i * 25 : -300,
+                    vy: vert ? 300 : i * 25,
                     r: 5,
                 });
             }
             boss.fireTimer = 1.0;
         } else {
-            // Bogen-Schuss (NEU)
+            // Bogen-Schuss
             for (let i = 0; i < 8; i++) {
-                const angle = Math.PI * 0.6 + (Math.PI * 0.8 / 7) * i;
+                const baseAngle = vert ? 0 : Math.PI * 0.6;
+                const spread = vert ? Math.PI * 0.8 : Math.PI * 0.8;
+                const angle = baseAngle + (spread / 7) * i;
                 state.enemyBullets.push({
-                    x: boss.x - 100,
-                    y: boss.y,
+                    x: bx,
+                    y: by,
                     vx: Math.cos(angle) * 280,
-                    vy: Math.sin(angle) * 280 - 100,
+                    vy: Math.sin(angle) * 280 + (vert ? 100 : -100),
                     r: 5,
                 });
             }
@@ -215,10 +250,10 @@ function fireBossPattern(boss) {
             for (let i = 0; i < 14; i++) {
                 const angle = (Math.PI * 2 / 14) * i;
                 state.enemyBullets.push({
-                    x: boss.x - 110,
-                    y: boss.y,
-                    vx: Math.cos(angle) * 230 - 160,
-                    vy: Math.sin(angle) * 230,
+                    x: bx,
+                    y: by,
+                    vx: Math.cos(angle) * 230 + (vert ? 0 : -160),
+                    vy: Math.sin(angle) * 230 + (vert ? 160 : 0),
                     r: 7,
                 });
             }
@@ -231,8 +266,8 @@ function fireBossPattern(boss) {
             for (let i = 0; i < 8; i++) {
                 const angle = baseAngle + (Math.PI * 2 / 8) * i;
                 state.enemyBullets.push({
-                    x: boss.x - 110,
-                    y: boss.y,
+                    x: bx,
+                    y: by,
                     vx: Math.cos(angle) * 260,
                     vy: Math.sin(angle) * 260,
                     r: 6,
@@ -241,15 +276,15 @@ function fireBossPattern(boss) {
             state.screenFlash = 0.25;
             boss.fireTimer = 0.7;
         } else if (patternVariant === 2) {
-            // Aimed Burst + Random (NEU)
-            const dx = state.player.x - (boss.x - 120);
-            const dy = state.player.y - boss.y;
+            // Aimed Burst + Random
+            const dx = state.player.x - bx;
+            const dy = state.player.y - by;
             const len = Math.hypot(dx, dy) || 1;
             for (let i = 0; i < 6; i++) {
                 const spread = (Math.random() - 0.5) * 80;
                 state.enemyBullets.push({
-                    x: boss.x - 110,
-                    y: boss.y + (Math.random() - 0.5) * 60,
+                    x: vert ? bx + (Math.random() - 0.5) * 60 : bx,
+                    y: vert ? by : by + (Math.random() - 0.5) * 60,
                     vx: (dx / len) * 350 + spread,
                     vy: (dy / len) * 350 + spread,
                     r: 5,
@@ -257,15 +292,14 @@ function fireBossPattern(boss) {
             }
             boss.fireTimer = 0.9;
         } else {
-            // Wall Pattern (NEU)
-            const wallY = state.player.y;
+            // Wall Pattern
+            const wallPos = vert ? state.player.x : state.player.y;
             for (let i = -8; i <= 8; i++) {
-                const delay = Math.abs(i) * 0.08;
                 state.enemyBullets.push({
-                    x: boss.x - 120 + Math.abs(i) * 25,
-                    y: wallY + i * 28,
-                    vx: -260,
-                    vy: 0,
+                    x: vert ? wallPos + i * 28 : bx + Math.abs(i) * 25,
+                    y: vert ? by + Math.abs(i) * 25 : wallPos + i * 28,
+                    vx: vert ? 0 : -260,
+                    vy: vert ? 260 : 0,
                     r: 6,
                 });
             }
@@ -279,10 +313,10 @@ function fireBossPattern(boss) {
             // Breite Salve
             for (let i = -6; i <= 6; i++) {
                 state.enemyBullets.push({
-                    x: boss.x - 120,
-                    y: boss.y,
-                    vx: -430,
-                    vy: i * 42,
+                    x: vert ? bx + i * 42 : bx,
+                    y: vert ? by : by + i * 42,
+                    vx: vert ? i * 42 : -430,
+                    vy: vert ? 430 : i * 42,
                     r: 8,
                 });
             }
@@ -291,15 +325,15 @@ function fireBossPattern(boss) {
             boss.fireTimer = 0.85;
         } else if (patternVariant === 1) {
             // Zielverfolgende Geschosse + Facher
-            const dx = state.player.x - (boss.x - 120);
-            const dy = state.player.y - boss.y;
+            const dx = state.player.x - bx;
+            const dy = state.player.y - by;
             const len = Math.hypot(dx, dy) || 1;
             for (let i = -1; i <= 1; i++) {
                 state.enemyBullets.push({
-                    x: boss.x - 120,
-                    y: boss.y + i * 40,
-                    vx: (dx / len) * 380,
-                    vy: (dy / len) * 380 + i * 30,
+                    x: vert ? bx + i * 40 : bx,
+                    y: vert ? by : by + i * 40,
+                    vx: (dx / len) * 380 + (vert ? i * 30 : 0),
+                    vy: (dy / len) * 380 + (vert ? 0 : i * 30),
                     r: 9,
                     homing: true,
                     homingTimer: 1.0,
@@ -307,10 +341,10 @@ function fireBossPattern(boss) {
             }
             for (let i = -3; i <= 3; i++) {
                 state.enemyBullets.push({
-                    x: boss.x - 100,
-                    y: boss.y + i * 30,
-                    vx: -360,
-                    vy: i * 55,
+                    x: vert ? bx + i * 30 : bx,
+                    y: vert ? by : by + i * 30,
+                    vx: vert ? i * 55 : -360,
+                    vy: vert ? 360 : i * 55,
                     r: 6,
                 });
             }
@@ -324,8 +358,8 @@ function fireBossPattern(boss) {
                 for (let i = 0; i < 10; i++) {
                     const angle = (Math.PI * 2 / 10) * i + offset + boss.t;
                     state.enemyBullets.push({
-                        x: boss.x - 110,
-                        y: boss.y,
+                        x: bx,
+                        y: by,
                         vx: Math.cos(angle) * (250 + ring * 50),
                         vy: Math.sin(angle) * (250 + ring * 50),
                         r: 6,
@@ -336,22 +370,22 @@ function fireBossPattern(boss) {
             state.screenShake = 10;
             boss.fireTimer = 1.3;
         } else {
-            // CROSS PATTERN (NEU) - Kreuzfoermiger Angriff
+            // CROSS PATTERN - Kreuzfoermiger Angriff
             for (let i = 0; i < 5; i++) {
-                // Horizontal
+                // Hauptachse
                 state.enemyBullets.push({
-                    x: boss.x - 120,
-                    y: boss.y,
-                    vx: -420 - i * 30,
-                    vy: 0,
+                    x: bx,
+                    y: by,
+                    vx: vert ? 0 : -420 - i * 30,
+                    vy: vert ? 420 + i * 30 : 0,
                     r: 7,
                 });
-                // Vertikal
+                // Querachse
                 state.enemyBullets.push({
-                    x: boss.x - 120,
-                    y: boss.y,
-                    vx: -200,
-                    vy: (i - 2) * 120,
+                    x: bx,
+                    y: by,
+                    vx: vert ? -200 : -200,
+                    vy: vert ? (i - 2) * 120 : (i - 2) * 120,
                     r: 6,
                     homing: true,
                     homingTimer: 0.6,
@@ -390,7 +424,7 @@ function killBoss() {
     for (let i = 0; i < 5; i++) {
         setTimeout(() => {
             spawnExplosion(
-                state.boss ? state.boss.x + (Math.random() - 0.5) * 200 : CONFIG.width - 200,
+                state.boss ? state.boss.x + (Math.random() - 0.5) * 200 : CONFIG.width / 2,
                 state.boss ? state.boss.y + (Math.random() - 0.5) * 150 : CONFIG.height / 2,
                 2 + Math.random()
             );
@@ -408,7 +442,6 @@ function killBoss() {
 
     // Check for victory at level 99
     if (state.stageIndex >= 98) {
-        // Won the game! (stageIndex is 0-based, so 98 = level 99)
         state.victory = true;
         state.running = false;
         state.screenFlash = 1;
@@ -463,6 +496,11 @@ export function drawBoss(ctx) {
 
     ctx.save();
     ctx.translate(boss.x, boss.y);
+
+    // Im vertikalen Modus: Boss um 90° drehen (nach unten zeigen)
+    if (isVertical()) {
+        ctx.rotate(Math.PI / 2);
+    }
 
     // Damage Flash Effect
     if (boss.damageFlash > 0) {

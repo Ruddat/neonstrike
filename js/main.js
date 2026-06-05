@@ -1,6 +1,7 @@
 import { CONFIG } from './config.js';
 import { state } from './state.js';
 import { initInput, consumePause, consumeFullscreen, touch, getTouchButtons, isMobile } from './input.js';
+import { isVertical } from './direction.js';
 import {
     resetPlayer,
     updatePlayer,
@@ -141,6 +142,10 @@ function resetGame() {
     state.formationTimer = 0;
     state.formationWave = 0;
 
+    // Scroll-Richtung aus Stage setzen
+    const initialStage = getStage(0);
+    state.scrollDirection = initialStage.scrollDirection || 'horizontal';
+
     // Combo Reset
     state.comboCount = 0;
     state.comboTimer = 0;
@@ -259,6 +264,17 @@ function update(dt) {
             state.hyperspaceJump = false;
             state.warpStars.length = 0;
             state.stageIndex++;
+            // Scroll-Richtung aus neuer Stage setzen
+            const nextStage = getStage(state.stageIndex);
+            state.scrollDirection = nextStage.scrollDirection || 'horizontal';
+            // Spieler-Repositionierung bei Richtungswechsel
+            if (nextStage.scrollDirection === 'vertical') {
+                state.player.x = CONFIG.width / 2;
+                state.player.y = CONFIG.height - 80;
+            } else {
+                state.player.x = 120;
+                state.player.y = CONFIG.height / 2;
+            }
             // Boss braucht spaeter mehr Kills - more aggressive scaling at higher levels
             state.killsForBoss = Math.min(60, state.killsForBoss + 3 + Math.floor(state.stageIndex * 0.2));
             state.stageTransition = true;
@@ -343,6 +359,17 @@ function render() {
             ctx.fillStyle = '#bae6fd';
             ctx.font = '800 28px Arial';
             ctx.fillText(stage.name.toUpperCase(), CONFIG.width / 2, CONFIG.height / 2 + 30);
+
+            // Scroll-Modus Anzeige bei vertikalen Levels
+            if (stage.scrollDirection === 'vertical') {
+                ctx.fillStyle = 'rgba(239, 68, 68, 0.3)';
+                ctx.font = '800 22px Arial';
+                ctx.fillText('VERTICAL SCROLL — 1945 STYLE', CONFIG.width / 2, CONFIG.height / 2 + 65);
+
+                ctx.fillStyle = '#ef4444';
+                ctx.font = '800 20px Arial';
+                ctx.fillText('VERTICAL SCROLL — 1945 STYLE', CONFIG.width / 2, CONFIG.height / 2 + 65);
+            }
             ctx.restore();
         }
     }
@@ -1016,6 +1043,13 @@ function drawHud() {
     ctx.fillStyle = 'rgba(248,250,252,.82)';
     ctx.font = '700 16px Arial';
     ctx.fillText(stage.name.toUpperCase(), CONFIG.width - 34, CONFIG.height - 40);
+
+    // Scroll-Modus Anzeige (vertikal)
+    if (isVertical()) {
+        ctx.fillStyle = '#ef4444';
+        ctx.font = '700 13px Arial';
+        ctx.fillText('VERTICAL SCROLL', CONFIG.width - 34, CONFIG.height - 22);
+    }
 
     // FULLSCREEN HINT (nur Desktop)
     if (!touch.active) {

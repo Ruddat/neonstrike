@@ -5,11 +5,19 @@ import { clamp } from './utils.js';
 import { assets } from './assets.js';
 import { updatePlayerPowerTimers } from './powerups.js';
 import { audio } from './audio.js';
-import { spawnThrustParticle, spawnHitSpark } from './effects.js';
+import { spawnThrustParticle } from './effects.js';
+import {
+    isVertical,
+    playerStartX, playerStartY,
+    playerMinX, playerMaxX, playerMinY, playerMaxY,
+    bulletOffsetX, bulletOffsetY,
+    mainDirectionX, mainDirectionY,
+    thrustOffsetX, thrustOffsetY,
+} from './direction.js';
 
 export function resetPlayer() {
-    state.player.x = 120;
-    state.player.y = CONFIG.height / 2;
+    state.player.x = playerStartX();
+    state.player.y = playerStartY();
     state.player.lives = 3;
     state.player.bombs = 3;
     state.player.bombFragments = 0;
@@ -56,8 +64,9 @@ export function updatePlayer(dt) {
         player.y += dy * player.speed * dt;
     }
 
-    player.x = clamp(player.x, 34, CONFIG.width * 0.52);
-    player.y = clamp(player.y, 44, CONFIG.height - 44);
+    // Richtungabhaengige Begrenzung
+    player.x = clamp(player.x, playerMinX(), playerMaxX());
+    player.y = clamp(player.y, playerMinY(), playerMaxY());
 
     player.cooldown -= dt;
     player.invulnerable -= dt;
@@ -68,7 +77,7 @@ export function updatePlayer(dt) {
 
     // Engine Thrust Particles (reduziert fuer Performance)
     if (player.thrustTimer <= 0) {
-        spawnThrustParticle(player.x - 40, player.y);
+        spawnThrustParticle(thrustOffsetX(player.x), thrustOffsetY(player.y));
         player.thrustTimer = 0.06;
     }
 
@@ -93,14 +102,19 @@ function fireBullet() {
     audio.playSfx('shoot');
 
     const lv = player.weaponLevel;
+    const vx = mainDirectionX();
+    const vy = mainDirectionY();
+    const offX = bulletOffsetX();
+    const offY = bulletOffsetY();
+    const vert = isVertical();
 
     if (player.weaponType === 'railgun') {
         // Railgun: Level steigert Pierce + Damage
         state.bullets.push({
-            x: player.x + 48,
-            y: player.y,
-            vx: 1200,
-            vy: 0,
+            x: player.x + offX,
+            y: player.y + offY,
+            vx: 1200 * vx,
+            vy: 1200 * vy,
             r: 9 + lv,
             damage: 3 + lv * 2,
             color: '#e0f2fe',
@@ -110,11 +124,13 @@ function fireBullet() {
 
         // Level 3+: Side railgun beams
         if (lv >= 3) {
+            const sideVx = 1100 * vx + (vert ? -60 : 0);
+            const sideVy = 1100 * vy + (vert ? 0 : -60);
             state.bullets.push({
-                x: player.x + 30,
-                y: player.y - 18,
-                vx: 1100,
-                vy: -60,
+                x: player.x + offX * 0.6,
+                y: player.y + offY * 0.6 + (vert ? 0 : -18),
+                vx: vert ? 1100 * vx : 1100,
+                vy: vert ? 1100 * vy - 60 : 0,
                 r: 6,
                 damage: 2 + lv,
                 color: '#7dd3fc',
@@ -122,10 +138,10 @@ function fireBullet() {
                 rail: true,
             });
             state.bullets.push({
-                x: player.x + 30,
-                y: player.y + 18,
-                vx: 1100,
-                vy: 60,
+                x: player.x + offX * 0.6,
+                y: player.y + offY * 0.6 + (vert ? 0 : 18),
+                vx: vert ? 1100 * vx : 1100,
+                vy: vert ? 1100 * vy + 60 : 0,
                 r: 6,
                 damage: 2 + lv,
                 color: '#7dd3fc',
@@ -144,12 +160,13 @@ function fireBullet() {
         const count = lv >= 5 ? 7 : lv >= 4 ? 5 : lv >= 3 ? 5 : lv >= 2 ? 3 : 3;
         const spreadAngle = 0.18 + lv * 0.04;
         const baseDamage = 0.7 + lv * 0.3;
+        const baseAngle = vert ? -Math.PI / 2 : 0; // Nach oben bei vertikal
 
         for (let i = 0; i < count; i++) {
-            const angle = -spreadAngle * (count - 1) / 2 + spreadAngle * i;
+            const angle = baseAngle + (-spreadAngle * (count - 1) / 2 + spreadAngle * i);
             state.bullets.push({
-                x: player.x + 48,
-                y: player.y,
+                x: player.x + offX,
+                y: player.y + offY,
                 vx: 680 * Math.cos(angle),
                 vy: 680 * Math.sin(angle),
                 r: 4 + Math.floor(lv / 2),
@@ -164,10 +181,10 @@ function fireBullet() {
         // Plasma: Level steigert Damage + Groesse + Sekundaer-Orbs
         const baseDmg = 1.5 + lv * 0.8;
         state.bullets.push({
-            x: player.x + 48,
-            y: player.y,
-            vx: 580,
-            vy: 0,
+            x: player.x + offX,
+            y: player.y + offY,
+            vx: 580 * vx,
+            vy: 580 * vy,
             r: 7 + lv * 2,
             damage: baseDmg,
             color: '#a855f7',
@@ -177,20 +194,20 @@ function fireBullet() {
         // Level 3+: Tracking plasma orbs
         if (lv >= 3) {
             state.bullets.push({
-                x: player.x + 30,
-                y: player.y - 22,
-                vx: 500,
-                vy: -80,
+                x: player.x + offX * 0.6,
+                y: player.y + offY * 0.6 + (vert ? -22 : 0),
+                vx: 500 * vx + (vert ? -80 : 0),
+                vy: 500 * vy + (vert ? 0 : -80),
                 r: 5 + lv,
                 damage: baseDmg * 0.5,
                 color: '#c084fc',
                 plasma: true,
             });
             state.bullets.push({
-                x: player.x + 30,
-                y: player.y + 22,
-                vx: 500,
-                vy: 80,
+                x: player.x + offX * 0.6,
+                y: player.y + offY * 0.6 + (vert ? 22 : 0),
+                vx: 500 * vx + (vert ? 80 : 0),
+                vy: 500 * vy + (vert ? 0 : 80),
                 r: 5 + lv,
                 damage: baseDmg * 0.5,
                 color: '#c084fc',
@@ -203,10 +220,10 @@ function fireBullet() {
     // LASER (Standard): Level steigert Schuesse + Damage
     const laserDamage = 1 + Math.floor(lv / 2);
     const base = {
-        x: player.x + 48,
-        y: player.y,
-        vx: 780,
-        vy: 0,
+        x: player.x + offX,
+        y: player.y + offY,
+        vx: 780 * vx,
+        vy: 780 * vy,
         r: 5,
         damage: laserDamage,
         color: '#facc15',
@@ -218,7 +235,8 @@ function fireBullet() {
     if (lv >= 2) {
         state.bullets.push({
             ...base,
-            y: player.y - 10,
+            y: player.y + offY + (vert ? -10 : 0),
+            x: player.x + offX + (vert ? -10 : 0),
             damage: laserDamage,
         });
     }
@@ -227,7 +245,8 @@ function fireBullet() {
     if (lv >= 3) {
         state.bullets.push({
             ...base,
-            y: player.y + 10,
+            y: player.y + offY + (vert ? 10 : 0),
+            x: player.x + offX + (vert ? 10 : 0),
             damage: laserDamage * 0.8,
         });
     }
@@ -236,16 +255,18 @@ function fireBullet() {
     if (lv >= 4) {
         state.bullets.push({
             ...base,
-            y: player.y - 8,
-            vx: 720,
-            vy: -90,
+            y: player.y + offY + (vert ? -8 : 0),
+            x: player.x + offX + (vert ? -8 : 0),
+            vx: 720 * vx + (vert ? -90 : 0),
+            vy: 720 * vy + (vert ? 0 : -90),
             damage: laserDamage * 0.7,
         });
         state.bullets.push({
             ...base,
-            y: player.y + 8,
-            vx: 720,
-            vy: 90,
+            y: player.y + offY + (vert ? 8 : 0),
+            x: player.x + offX + (vert ? 8 : 0),
+            vx: 720 * vx + (vert ? 90 : 0),
+            vy: 720 * vy + (vert ? 0 : 90),
             damage: laserDamage * 0.7,
         });
     }
@@ -254,8 +275,10 @@ function fireBullet() {
     if (lv >= 5) {
         state.bullets.push({
             ...base,
-            x: player.x - 20,
-            vx: -500,
+            x: player.x - offX * 0.5,
+            y: player.y - offY * 0.5,
+            vx: -500 * vx,
+            vy: -500 * vy,
             damage: laserDamage * 0.5,
             color: '#fb923c',
         });
@@ -310,6 +333,11 @@ export function drawPlayer(ctx) {
         ctx.save();
         ctx.translate(player.x + shakeOffX, player.y + shakeOffY);
 
+        // Im vertikalen Modus: Schiff um 90° gegen UZS drehen (nach oben)
+        if (isVertical()) {
+            ctx.rotate(-Math.PI / 2);
+        }
+
         if (player.invulnerable > 0 && Math.floor(performance.now() / 90) % 2 === 0) {
             ctx.globalAlpha = 0.45;
         }
@@ -355,6 +383,11 @@ export function drawPlayer(ctx) {
     ctx.save();
     ctx.translate(player.x + shakeOffX, player.y + shakeOffY);
 
+    // Im vertikalen Modus: Schiff nach oben drehen
+    if (isVertical()) {
+        ctx.rotate(-Math.PI / 2);
+    }
+
     if (player.invulnerable > 0 && Math.floor(performance.now() / 90) % 2 === 0) {
         ctx.globalAlpha = 0.45;
     }
@@ -381,14 +414,25 @@ export function drawBullets(ctx) {
 
         if (bullet.rail) {
             // Railgun: Glow via breites semi-transparentes Rechteck
-            ctx.fillStyle = 'rgba(56, 189, 248, 0.25)';
-            ctx.fillRect(bullet.x - 24, bullet.y - 9, 110, 18);
-
-            ctx.fillStyle = '#e0f2fe';
-            ctx.fillRect(bullet.x - 12, bullet.y - 5, 80, 10);
-
-            ctx.fillStyle = '#38bdf8';
-            ctx.fillRect(bullet.x - 24, bullet.y - 2, 110, 4);
+            const vert = isVertical();
+            const len = 110;
+            const w = 18;
+            if (vert) {
+                // Vertikale Railgun
+                ctx.fillStyle = 'rgba(56, 189, 248, 0.25)';
+                ctx.fillRect(bullet.x - w / 2, bullet.y - len, w, len);
+                ctx.fillStyle = '#e0f2fe';
+                ctx.fillRect(bullet.x - 5, bullet.y - len + 10, 10, len - 20);
+                ctx.fillStyle = '#38bdf8';
+                ctx.fillRect(bullet.x - 2, bullet.y - len, 4, len);
+            } else {
+                ctx.fillStyle = 'rgba(56, 189, 248, 0.25)';
+                ctx.fillRect(bullet.x - 24, bullet.y - 9, 110, 18);
+                ctx.fillStyle = '#e0f2fe';
+                ctx.fillRect(bullet.x - 12, bullet.y - 5, 80, 10);
+                ctx.fillStyle = '#38bdf8';
+                ctx.fillRect(bullet.x - 24, bullet.y - 2, 110, 4);
+            }
             continue;
         }
 
