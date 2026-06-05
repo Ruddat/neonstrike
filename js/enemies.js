@@ -663,9 +663,9 @@ export function drawEnemies(ctx) {
             ctx.save();
             ctx.translate(enemy.x, enemy.y);
 
-            // Im vertikalen Modus: Gegner um 90° drehen (nach unten zeigen)
+            // Im vertikalen Modus: Gegner um -90° drehen (nach unten zeigen)
             if (isVertical()) {
-                ctx.rotate(Math.PI / 2);
+                ctx.rotate(-Math.PI / 2);
             }
 
             // Glow via semi-transparente Form (ohne shadowBlur)
@@ -685,9 +685,9 @@ export function drawEnemies(ctx) {
         ctx.save();
         ctx.translate(enemy.x, enemy.y);
 
-        // Im vertikalen Modus: Gegner um 90° drehen
+        // Im vertikalen Modus: Gegner um -90° drehen (nach unten zeigen)
         if (isVertical()) {
-            ctx.rotate(Math.PI / 2);
+            ctx.rotate(-Math.PI / 2);
         }
 
         ctx.fillStyle = enemy.type === 'heavy' ? '#475569' : '#334155';

@@ -497,9 +497,9 @@ export function drawBoss(ctx) {
     ctx.save();
     ctx.translate(boss.x, boss.y);
 
-    // Im vertikalen Modus: Boss um 90° drehen (nach unten zeigen)
+    // Im vertikalen Modus: Boss um -90° drehen (nach unten zeigen)
     if (isVertical()) {
-        ctx.rotate(Math.PI / 2);
+        ctx.rotate(-Math.PI / 2);
     }
 
     // Damage Flash Effect

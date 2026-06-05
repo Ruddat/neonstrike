@@ -31,6 +31,11 @@ export const state = {
     stageTransition: false,
     stageTransitionTimer: 0,
 
+    // Direction Change Transition (horizontal ↔ vertical)
+    directionChange: false,
+    directionChangeTimer: 0,
+    prevScrollDirection: 'horizontal',
+
     // Hyperspace Jump (nach Boss-Kill)
     hyperspaceJump: false,
     hyperspaceTimer: 0,

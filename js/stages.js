@@ -129,11 +129,11 @@ export const stages = [
         enemyTypes: ['drone', 'heavy'],
         bossName: 'Omega Prime',
     },
-    // ===================== VERTICAL LEVELS (1945-Style) =====================
+    // ===================== LEVEL 11-15 (Richtung dynamisch via getScrollDirection) =====================
     {
         id: 11,
         name: 'Pacific Storm',
-        scrollDirection: 'vertical',
+        scrollDirection: 'horizontal', // Wird von getScrollDirection() überschrieben
         colors: {
             top: '#071a3e',
             mid: '#0c2d5e',
@@ -146,7 +146,7 @@ export const stages = [
     {
         id: 12,
         name: 'Island Fortress',
-        scrollDirection: 'vertical',
+        scrollDirection: 'horizontal',
         colors: {
             top: '#0a2e1a',
             mid: '#14532d',
@@ -159,7 +159,7 @@ export const stages = [
     {
         id: 13,
         name: 'Dogfight Alley',
-        scrollDirection: 'vertical',
+        scrollDirection: 'horizontal',
         colors: {
             top: '#2a1208',
             mid: '#7c2d12',
@@ -172,7 +172,7 @@ export const stages = [
     {
         id: 14,
         name: 'Carrier Assault',
-        scrollDirection: 'vertical',
+        scrollDirection: 'horizontal',
         colors: {
             top: '#1a0a2e',
             mid: '#3b0764',
@@ -185,7 +185,7 @@ export const stages = [
     {
         id: 15,
         name: 'Final Intercept',
-        scrollDirection: 'vertical',
+        scrollDirection: 'horizontal',
         colors: {
             top: '#2e0a0a',
             mid: '#7f1d1d',
@@ -197,6 +197,12 @@ export const stages = [
     },
 ];
 
+/** Scroll-Richtung basierend auf Level-Nummer: alle 5 Level wechselnd */
+export function getScrollDirection(level) {
+    const blockIndex = Math.floor((level - 1) / 5);
+    return blockIndex % 2 === 0 ? 'horizontal' : 'vertical';
+}
+
 export function getStage(index) {
     const base = stages[index % stages.length];
     const cycle = Math.floor(index / stages.length); // 0 for first 15, 1 for 16-30, etc.
@@ -206,11 +212,15 @@ export function getStage(index) {
     const speedBonus = cycle * 0.3;
     const hpBonus = cycle * 2;
 
+    // Scroll-Richtung alle 5 Level wechseln
+    const scrollDirection = getScrollDirection(level);
+
     return {
         ...base,
         id: level,
         level: level,
         name: cycle > 0 ? base.name + ' +' + (cycle + 1) : base.name,
+        scrollDirection,
         enemySpeed: base.enemySpeed + speedBonus,
         enemyHpBonus: hpBonus,
         bossHpBonus: cycle * 80,

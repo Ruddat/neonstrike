@@ -19,7 +19,7 @@ import {
 
 import { updateCollisions } from './collisions.js';
 import { audio } from './audio.js';
-import { getStage } from './stages.js';
+import { getStage, getScrollDirection } from './stages.js';
 
 import {
     updateBackground,
@@ -136,6 +136,9 @@ function resetGame() {
     state.stageIndex = 0;
     state.stageTransition = false;
     state.stageTransitionTimer = 0;
+    state.directionChange = false;
+    state.directionChangeTimer = 0;
+    state.prevScrollDirection = 'horizontal';
     state.hyperspaceJump = false;
     state.hyperspaceTimer = 0;
     state.warpStars.length = 0;
@@ -266,9 +269,19 @@ function update(dt) {
             state.stageIndex++;
             // Scroll-Richtung aus neuer Stage setzen
             const nextStage = getStage(state.stageIndex);
-            state.scrollDirection = nextStage.scrollDirection || 'horizontal';
+            const newDirection = nextStage.scrollDirection || 'horizontal';
+            const prevDirection = state.scrollDirection;
+
+            // Richtungswechsel erkennen
+            if (prevDirection !== newDirection) {
+                state.directionChange = true;
+                state.directionChangeTimer = 2.5;
+                state.prevScrollDirection = prevDirection;
+            }
+
+            state.scrollDirection = newDirection;
             // Spieler-Repositionierung bei Richtungswechsel
-            if (nextStage.scrollDirection === 'vertical') {
+            if (newDirection === 'vertical') {
                 state.player.x = CONFIG.width / 2;
                 state.player.y = CONFIG.height - 80;
             } else {
@@ -280,6 +293,14 @@ function update(dt) {
             state.stageTransition = true;
             state.stageTransitionTimer = 3.0;
             backgroundDirty = true;
+        }
+    }
+
+    // Direction Change Timer
+    if (state.directionChange) {
+        state.directionChangeTimer -= dt;
+        if (state.directionChangeTimer <= 0) {
+            state.directionChange = false;
         }
     }
 
@@ -372,6 +393,11 @@ function render() {
             }
             ctx.restore();
         }
+    }
+
+    // Direction Change Transition Overlay
+    if (state.directionChange) {
+        drawDirectionChangeOverlay(ctx);
     }
 
     // Victory overlay on canvas
@@ -888,6 +914,104 @@ function drawTouchControls(ctx) {
     ctx.fillStyle = 'rgba(148, 163, 184, 0.7)';
     ctx.fillRect(pauseBtn.x - 7, pauseBtn.y - 8, 5, 16);
     ctx.fillRect(pauseBtn.x + 2, pauseBtn.y - 8, 5, 16);
+
+    ctx.restore();
+}
+
+// ===================== DIRECTION CHANGE OVERLAY =====================
+function drawDirectionChangeOverlay(ctx) {
+    const t = state.directionChangeTimer;
+    const maxT = 2.5;
+    const progress = 1 - (t / maxT); // 0→1
+
+    ctx.save();
+
+    // Dunkles Overlay
+    const overlayAlpha = t > 2.0 ? (2.5 - t) / 0.5  // Fade in
+        : t < 0.5 ? t / 0.5                            // Fade out
+        : 1;
+    ctx.fillStyle = `rgba(2, 6, 23, ${0.8 * overlayAlpha})`;
+    ctx.fillRect(0, 0, CONFIG.width, CONFIG.height);
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    const cx = CONFIG.width / 2;
+    const cy = CONFIG.height / 2;
+
+    // Rotierender Pfeil-Effekt
+    const isNowVertical = state.scrollDirection === 'vertical';
+    const arrowAngle = isNowVertical ? 0 : -Math.PI / 2; // Pfeil zeigt nach unten (vertical) oder nach rechts (horizontal)
+    const rotProgress = Math.min(1, progress * 2.5); // Schnelle Rotation am Anfang
+    const currentAngle = arrowAngle * rotProgress + (isNowVertical ? -Math.PI / 2 : 0) * (1 - rotProgress);
+
+    // Glow-Kreis
+    const glowR = 80 + Math.sin(progress * Math.PI * 4) * 20;
+    const gradient = ctx.createRadialGradient(cx, cy - 30, 0, cx, cy - 30, glowR);
+    gradient.addColorStop(0, `rgba(56, 189, 248, ${0.3 * overlayAlpha})`);
+    gradient.addColorStop(0.5, `rgba(56, 189, 248, ${0.1 * overlayAlpha})`);
+    gradient.addColorStop(1, 'rgba(56, 189, 248, 0)');
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(cx, cy - 30, glowR, 0, Math.PI * 2);
+    ctx.fill();
+
+    // DREHENDER PFEIL
+    ctx.save();
+    ctx.translate(cx, cy - 30);
+    ctx.rotate(currentAngle + Math.sin(progress * Math.PI * 6) * 0.15 * (1 - rotProgress));
+    ctx.strokeStyle = `rgba(56, 189, 248, ${0.9 * overlayAlpha})`;
+    ctx.lineWidth = 4;
+    ctx.fillStyle = `rgba(56, 189, 248, ${0.8 * overlayAlpha})`;
+
+    // Pfeil-Körper
+    ctx.beginPath();
+    ctx.moveTo(-35, 0);
+    ctx.lineTo(25, 0);
+    ctx.stroke();
+
+    // Pfeil-Spitze
+    ctx.beginPath();
+    ctx.moveTo(35, 0);
+    ctx.lineTo(18, -12);
+    ctx.lineTo(18, 12);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.restore();
+
+    // DIRECTION CHANGE Text
+    const titleAlpha = overlayAlpha;
+    ctx.fillStyle = `rgba(249, 115, 22, ${0.3 * titleAlpha})`;
+    ctx.font = '900 56px Arial';
+    ctx.fillText('DIRECTION CHANGE', cx, cy + 55);
+
+    ctx.fillStyle = `rgba(249, 115, 22, ${titleAlpha})`;
+    ctx.font = '900 52px Arial';
+    ctx.fillText('DIRECTION CHANGE', cx, cy + 55);
+
+    // Neue Richtung anzeigen
+    const dirLabel = isNowVertical ? 'VERTICAL SCROLL — 1945 STYLE' : 'HORIZONTAL SCROLL — SIDESCROLLER';
+    const dirColor = isNowVertical ? '#ef4444' : '#38bdf8';
+
+    ctx.fillStyle = `rgba(${isNowVertical ? '239, 68, 68' : '56, 189, 248'}, ${0.3 * titleAlpha})`;
+    ctx.font = '800 28px Arial';
+    ctx.fillText(dirLabel, cx, cy + 100);
+
+    ctx.fillStyle = dirColor;
+    ctx.globalAlpha = titleAlpha;
+    ctx.font = '800 26px Arial';
+    ctx.fillText(dirLabel, cx, cy + 100);
+    ctx.globalAlpha = 1;
+
+    // Scan-Linien Effekt
+    if (progress < 0.6) {
+        const scanAlpha = (1 - progress / 0.6) * 0.15;
+        for (let y = 0; y < CONFIG.height; y += 4) {
+            ctx.fillStyle = `rgba(56, 189, 248, ${scanAlpha})`;
+            ctx.fillRect(0, y, CONFIG.width, 1);
+        }
+    }
 
     ctx.restore();
 }
