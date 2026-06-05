@@ -31,8 +31,13 @@ let bombBtn = { x: 0, y: 0, r: 0 };
 let pauseBtn = { x: 0, y: 0, r: 0 };
 
 // Mobile-Detection
+// Verwendet (hover: none) um echte Mobilgeräte (Handy/Tablet) von
+// Touchscreen-Laptops zu unterscheiden. Touchscreen-Laptops haben eine
+// Maus und können hover, daher liefert (hover: none) dort false.
 export function isMobile() {
-    return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    const hasNoHover = window.matchMedia('(hover: none)').matches;
+    return hasTouch && hasNoHover;
 }
 
 let pausePressed = false;
@@ -105,7 +110,17 @@ export function initInput(canvas) {
 
     // ===================== MOUSE =====================
     canvas.addEventListener('mousemove', (event) => {
-        if (touch.active) return; // Auf Touch-Geraeten Mouse ignorieren
+        // Wenn eine echte Maus bewegt wird, Touch-Modus deaktivieren
+        // (falls z.B. ein Touchscreen-Laptop versehentlich als Mobil erkannt wurde)
+        if (touch.active) {
+            touch.active = false;
+            touch.joyActive = false;
+            touch.fire = false;
+            touch.bomb = false;
+            touch.joystickTouchId = null;
+            touch.fireTouchId = null;
+            touch.bombTouchId = null;
+        }
         const rect = canvas.getBoundingClientRect();
         mouse.x = ((event.clientX - rect.left) / rect.width) * canvas.width;
         mouse.y = ((event.clientY - rect.top) / rect.height) * canvas.height;
@@ -116,6 +131,7 @@ export function initInput(canvas) {
         if (touch.active) return;
         if (event.button === 0) mouse.left = true;
         if (event.button === 2) mouse.right = true;
+        mouse.inside = true;
     });
 
     canvas.addEventListener('mouseup', (event) => {
@@ -138,7 +154,11 @@ export function initInput(canvas) {
     // ===================== TOUCH =====================
     canvas.addEventListener('touchstart', (event) => {
         event.preventDefault();
-        touch.active = true;
+        // Touch-Modus nur auf echten Mobilgeräten aktivieren,
+        // nicht auf Touchscreen-Laptops (die isMobile() korrekt als false erkennt)
+        if (isMobile()) {
+            touch.active = true;
+        }
 
         for (const t of event.changedTouches) {
             const rect = canvas.getBoundingClientRect();
