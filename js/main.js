@@ -20,6 +20,7 @@ import {
 import { updateCollisions } from './collisions.js';
 import { audio } from './audio.js';
 import { getStage, getScrollDirection } from './stages.js';
+import { isVertical as checkVertical } from './direction.js';
 
 import {
     updateBackground,
@@ -283,6 +284,8 @@ function update(dt) {
             state.scrollDirection = newDirection;
             // Hintergrund-Bild-Scroll zuruecksetzen
             resetBgImageScroll();
+            // Richtungsabhaengige Musik schalten
+            audio.switchToLevelMusic(newDirection === 'vertical');
             // Spieler-Repositionierung bei Richtungswechsel
             if (newDirection === 'vertical') {
                 state.player.x = CONFIG.width / 2;
@@ -658,6 +661,7 @@ function showHighscoreTable() {
         overlay.classList.remove('is-hidden');
 
         audio.stopIngame();
+        audio.stopVertical();
         audio.playMenu();
     };
 
@@ -1284,6 +1288,7 @@ function showGameOver() {
         overlay.classList.remove('is-hidden');
 
         audio.stopIngame();
+        audio.stopVertical();
         audio.playMenu();
     }
 }
@@ -1308,6 +1313,7 @@ function showVictory() {
         overlay.classList.remove('is-hidden');
 
         audio.stopIngame();
+        audio.stopVertical();
         audio.playMenu();
     }
 }

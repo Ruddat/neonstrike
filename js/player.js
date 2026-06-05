@@ -409,12 +409,12 @@ export function drawPlayer(ctx) {
 
 export function drawBullets(ctx) {
     const laser = assets.get('laserYellow');
+    const vert = isVertical();
 
     for (const bullet of state.bullets) {
 
         if (bullet.rail) {
             // Railgun: Glow via breites semi-transparentes Rechteck
-            const vert = isVertical();
             const len = 110;
             const w = 18;
             if (vert) {
@@ -456,17 +456,38 @@ export function drawBullets(ctx) {
         }
 
         if (laser) {
-            // Laser-Sprite: Glow via breiteres semi-transparentes Rechteck
-            ctx.fillStyle = 'rgba(250, 204, 21, 0.15)';
-            ctx.fillRect(bullet.x - 18, bullet.y - 12, 52, 24);
-            ctx.drawImage(laser, bullet.x - 16, bullet.y - 8, 48, 16);
+            ctx.save();
+            ctx.translate(bullet.x, bullet.y);
+
+            if (vert) {
+                // Vertikal: Laser-Sprite 90° gegen UZS drehen (nach oben fliegend)
+                ctx.rotate(-Math.PI / 2);
+                // Glow
+                ctx.fillStyle = 'rgba(250, 204, 21, 0.15)';
+                ctx.fillRect(-26, -12, 52, 24);
+                ctx.drawImage(laser, -24, -8, 48, 16);
+            } else {
+                // Horizontal: normal
+                ctx.fillStyle = 'rgba(250, 204, 21, 0.15)';
+                ctx.fillRect(-18, -12, 52, 24);
+                ctx.drawImage(laser, -16, -8, 48, 16);
+            }
+
+            ctx.restore();
             continue;
         }
 
-        // Fallback: einfaches Glow-Rechteck
-        ctx.fillStyle = bullet.color ? bullet.color.replace(')', ', 0.2)').replace('rgb(', 'rgba(') : 'rgba(250, 204, 21, 0.2)';
-        ctx.fillRect(bullet.x - 8, bullet.y - 7, 42, 14);
-        ctx.fillStyle = bullet.color || '#facc15';
-        ctx.fillRect(bullet.x - 4, bullet.y - 3, 34, 6);
+        // Fallback: einfaches Glow-Rechteck (richtungsabhaengig)
+        if (vert) {
+            ctx.fillStyle = bullet.color ? bullet.color.replace(')', ', 0.2)').replace('rgb(', 'rgba(') : 'rgba(250, 204, 21, 0.2)';
+            ctx.fillRect(bullet.x - 7, bullet.y - 21, 14, 42);
+            ctx.fillStyle = bullet.color || '#facc15';
+            ctx.fillRect(bullet.x - 3, bullet.y - 17, 6, 34);
+        } else {
+            ctx.fillStyle = bullet.color ? bullet.color.replace(')', ', 0.2)').replace('rgb(', 'rgba(') : 'rgba(250, 204, 21, 0.2)';
+            ctx.fillRect(bullet.x - 8, bullet.y - 7, 42, 14);
+            ctx.fillStyle = bullet.color || '#facc15';
+            ctx.fillRect(bullet.x - 4, bullet.y - 3, 34, 6);
+        }
     }
 }

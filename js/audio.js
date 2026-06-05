@@ -1,6 +1,7 @@
 export const audio = {
     menuMusic: null,
     ingameMusic: null,
+    verticalMusic: null,
     bossMusic: null,
     sfx: {},
 
@@ -12,6 +13,10 @@ export const audio = {
         this.ingameMusic = new Audio('assets/audio/ingame-theme.mp3');
         this.ingameMusic.loop = true;
         this.ingameMusic.volume = 0.38;
+
+        this.verticalMusic = new Audio('assets/audio/vertical-theme.mp3');
+        this.verticalMusic.loop = true;
+        this.verticalMusic.volume = 0.40;
 
         this.bossMusic = new Audio('assets/audio/boss-theme.mp3');
         this.bossMusic.loop = true;
@@ -48,6 +53,7 @@ export const audio = {
         if (!this.menuMusic) this.init();
 
         this.stopIngame();
+        this.stopVertical();
         this.stopBoss();
 
         this.menuMusic.currentTime = 0;
@@ -67,6 +73,7 @@ export const audio = {
         if (!this.ingameMusic) this.init();
 
         this.stopMenu();
+        this.stopVertical();
         this.stopBoss();
 
         this.ingameMusic.currentTime = 0;
@@ -82,11 +89,43 @@ export const audio = {
         this.ingameMusic.currentTime = 0;
     },
 
+    playVertical() {
+        if (!this.verticalMusic) this.init();
+
+        this.stopMenu();
+        this.stopIngame();
+        this.stopBoss();
+
+        this.verticalMusic.currentTime = 0;
+        this.verticalMusic.play().catch(() => {
+            console.log('Vertical-Audio wartet auf Benutzeraktion.');
+        });
+    },
+
+    stopVertical() {
+        if (!this.verticalMusic) return;
+
+        this.verticalMusic.pause();
+        this.verticalMusic.currentTime = 0;
+    },
+
+    /** Richtungsabhaengige Musik: Vertikal oder Horizontal */
+    switchToLevelMusic(vertical) {
+        if (vertical) {
+            this.stopIngame();
+            this.playVertical();
+        } else {
+            this.stopVertical();
+            this.playIngame();
+        }
+    },
+
     playBoss() {
         if (!this.bossMusic) this.init();
 
         this.stopMenu();
         this.stopIngame();
+        this.stopVertical();
 
         this.bossMusic.currentTime = 0;
         this.bossMusic.play().catch(() => {
@@ -104,6 +143,7 @@ export const audio = {
     stopAll() {
         this.stopMenu();
         this.stopIngame();
+        this.stopVertical();
         this.stopBoss();
     },
 };
