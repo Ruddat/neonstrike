@@ -15,9 +15,11 @@ export const touch = {
     joyY: 0,              // Joystick Y (-1 bis 1)
     fire: false,           // Feuer-Button gedrueckt
     bomb: false,           // Bomben-Button gedrueckt
+    shieldBash: false,     // Shield-Bash-Button gedrueckt
     joystickTouchId: null, // Touch-ID des Joystick-Fingers
     fireTouchId: null,     // Touch-ID des Feuer-Fingers
     bombTouchId: null,     // Touch-ID des Bomben-Fingers
+    shieldBashTouchId: null, // Touch-ID des Shield-Bash-Fingers
     joyOriginX: 0,        // Joystick-Ursprung X (Canvas-Koordinaten)
     joyOriginY: 0,        // Joystick-Ursprung Y
     joyKnobX: 0,          // Joystick-Knopf X
@@ -28,6 +30,7 @@ export const touch = {
 // Button-Positionen (wird in initInput berechnet)
 let fireBtn = { x: 0, y: 0, r: 0 };
 let bombBtn = { x: 0, y: 0, r: 0 };
+let shieldBashBtn = { x: 0, y: 0, r: 0 };
 let pauseBtn = { x: 0, y: 0, r: 0 };
 
 // Mobile-Detection
@@ -69,13 +72,16 @@ function updateButtonPositions(canvas) {
     // Bomben-Button: Ueber dem Feuer-Button
     bombBtn = { x: w - 120, y: h - 230, r: 44 };
 
+    // Shield-Bash Button: Links neben dem Feuer-Button
+    shieldBashBtn = { x: w - 240, y: h - 100, r: 38 };
+
     // Pause-Button: Oben rechts klein
     pauseBtn = { x: w - 44, y: 44, r: 22 };
 }
 
 // Export fuer Zeichnen der Touch-Controls
 export function getTouchButtons() {
-    return { fireBtn, bombBtn, pauseBtn };
+    return { fireBtn, bombBtn, shieldBashBtn, pauseBtn };
 }
 
 export function initInput(canvas) {
@@ -185,6 +191,13 @@ export function initInput(canvas) {
                 continue;
             }
 
+            // Shield-Bash-Button checken
+            if (touch.shieldBashTouchId === null && dist(cx, cy, shieldBashBtn.x, shieldBashBtn.y) < shieldBashBtn.r + 12) {
+                touch.shieldBashTouchId = t.identifier;
+                touch.shieldBash = true;
+                continue;
+            }
+
             // Joystick: Linke Haelfte des Bildschirms
             if (touch.joystickTouchId === null && cx < canvas.width * 0.45) {
                 touch.joystickTouchId = t.identifier;
@@ -250,6 +263,10 @@ export function initInput(canvas) {
                 touch.bombTouchId = null;
                 touch.bomb = false;
             }
+
+            if (t.identifier === touch.shieldBashTouchId) {
+                touch.shieldBashTouchId = null;
+            }
         }
     }, { passive: false });
 
@@ -272,6 +289,10 @@ export function initInput(canvas) {
             if (t.identifier === touch.bombTouchId) {
                 touch.bombTouchId = null;
                 touch.bomb = false;
+            }
+
+            if (t.identifier === touch.shieldBashTouchId) {
+                touch.shieldBashTouchId = null;
             }
         }
     }, { passive: false });

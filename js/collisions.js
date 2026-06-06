@@ -75,6 +75,17 @@ function handlePlayerBulletsVsEnemies() {
                     const points = enemy.points * state.comboMultiplier;
                     state.score += points;
                     state.killsThisStage++;
+                    state.waveKills++;
+
+                    // Wave System: Pruefen ob Wave abgeschlossen
+                    if (state.waveKills >= state.waveKillsNeeded && state.currentWave < state.totalWaves && !state.bossActive) {
+                        state.currentWave++;
+                        state.waveKills = 0;
+                        state.waveKillsNeeded = 8 + state.stageIndex + state.currentWave * 2;
+                        state.waveTransition = true;
+                        state.waveTransitionTimer = 1.5;
+                        state.screenFlash = 0.2;
+                    }
 
                     // Combo Text anzeigen
                     if (state.comboCount >= 3) {

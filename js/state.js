@@ -27,6 +27,24 @@ export const state = {
     comboMultiplier: 1,
     maxCombo: 0,
 
+    // OVERDRIVE Mode (Combo x5+)
+    overdrive: false,
+    overdriveTimer: 0,
+    overdriveGlow: 0,
+
+    // Boss Finisher (Slow-Motion)
+    slowMotion: false,
+    slowMotionTimer: 0,
+    slowMotionFactor: 1,
+
+    // Wave System
+    currentWave: 1,
+    totalWaves: 5,
+    waveKills: 0,
+    waveKillsNeeded: 8,
+    waveTransition: false,
+    waveTransitionTimer: 0,
+
     // Stage Transition
     stageTransition: false,
     stageTransitionTimer: 0,
@@ -89,5 +107,10 @@ export const state = {
         bombFragments: 0,
         maxBombFragments: 3,
         shakeTimer: 0,
+
+        // Shield-Bash
+        shieldBashCooldown: 0,
+        shieldBashActive: false,
+        shieldBashTimer: 0,
     },
 };

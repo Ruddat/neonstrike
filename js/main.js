@@ -157,6 +157,24 @@ function resetGame() {
     state.comboMultiplier = 1;
     state.maxCombo = 0;
 
+    // Overdrive Reset
+    state.overdrive = false;
+    state.overdriveTimer = 0;
+    state.overdriveGlow = 0;
+
+    // Slow-Motion Reset
+    state.slowMotion = false;
+    state.slowMotionTimer = 0;
+    state.slowMotionFactor = 1;
+
+    // Wave System Reset
+    state.currentWave = 1;
+    state.totalWaves = 5;
+    state.waveKills = 0;
+    state.waveKillsNeeded = 8;
+    state.waveTransition = false;
+    state.waveTransitionTimer = 0;
+
     resetPlayer();
     resetEnemies();
 
@@ -228,19 +246,62 @@ function loop(time) {
 }
 
 function update(dt) {
-    updateBackground(dt);
-    updatePlayer(dt);
-    updateBullets(dt);
+    // === SLOW-MOTION (Boss Finisher) ===
+    let effectiveDt = dt;
+    if (state.slowMotion) {
+        state.slowMotionTimer -= dt;
+        // Smooth ease-out: starts at 0.15x, returns to 1x
+        const progress = 1 - (state.slowMotionTimer / 1.8);
+        state.slowMotionFactor = 0.15 + progress * progress * 0.85;
+        effectiveDt = dt * state.slowMotionFactor;
+        if (state.slowMotionTimer <= 0) {
+            state.slowMotion = false;
+            state.slowMotionFactor = 1;
+        }
+    }
+
+    updateBackground(effectiveDt);
+    updatePlayer(effectiveDt);
+    updateBullets(effectiveDt);
 
     // Waehrend Hyperspace-Jump: keine Gegner/Boss/Kollisionen
     if (!state.hyperspaceJump) {
-        updateEnemies(dt);
-        updateBoss(dt);
+        updateEnemies(effectiveDt);
+        updateBoss(effectiveDt);
         updateCollisions();
     }
 
-    updatePowerups(dt);
-    updateEffects(dt);
+    updatePowerups(effectiveDt);
+    updateEffects(effectiveDt);
+
+    // === OVERDRIVE MODE ===
+    if (state.comboMultiplier >= 5 && !state.overdrive) {
+        state.overdrive = true;
+        state.overdriveTimer = 0;
+        state.overdriveGlow = 0;
+        state.screenFlash = 0.6;
+        state.screenShake = 20;
+    }
+    if (state.overdrive) {
+        state.overdriveTimer += dt;
+        state.overdriveGlow = Math.sin(state.overdriveTimer * 6) * 0.3 + 0.7;
+        // Overdrive ends when combo drops below x5
+        if (state.comboMultiplier < 5) {
+            state.overdrive = false;
+            state.overdriveGlow = 0;
+        }
+    }
+
+    // === SHIELD-BASH ===
+    if (state.player.shieldBashActive) {
+        state.player.shieldBashTimer -= dt;
+        if (state.player.shieldBashTimer <= 0) {
+            state.player.shieldBashActive = false;
+        }
+    }
+    if (state.player.shieldBashCooldown > 0) {
+        state.player.shieldBashCooldown -= dt;
+    }
 
     // Combo Timer
     if (state.comboTimer > 0) {
@@ -248,6 +309,14 @@ function update(dt) {
         if (state.comboTimer <= 0) {
             state.comboCount = 0;
             state.comboMultiplier = 1;
+        }
+    }
+
+    // === WAVE SYSTEM ===
+    if (state.waveTransition) {
+        state.waveTransitionTimer -= dt;
+        if (state.waveTransitionTimer <= 0) {
+            state.waveTransition = false;
         }
     }
 
@@ -299,6 +368,11 @@ function update(dt) {
             state.stageTransition = true;
             state.stageTransitionTimer = 3.0;
             backgroundDirty = true;
+            // Wave System Reset fuer neue Stage
+            state.currentWave = 1;
+            state.totalWaves = 5;
+            state.waveKills = 0;
+            state.waveKillsNeeded = 8 + state.stageIndex;
         }
     }
 
@@ -424,6 +498,57 @@ function render() {
     // Hyperspace Warp Effect (ueber alles)
     if (state.hyperspaceJump) {
         drawHyperspaceEffect(ctx);
+    }
+
+    // === OVERDRIVE GLOW (Screen-Overlay wenn aktiv) ===
+    if (state.overdrive) {
+        ctx.save();
+        const glowAlpha = state.overdriveGlow * 0.08;
+        ctx.fillStyle = `rgba(249, 115, 22, ${glowAlpha})`;
+        ctx.fillRect(0, 0, CONFIG.width, CONFIG.height);
+        // Vignette
+        const vg = ctx.createRadialGradient(
+            CONFIG.width / 2, CONFIG.height / 2, CONFIG.height * 0.3,
+            CONFIG.width / 2, CONFIG.height / 2, CONFIG.height * 0.8
+        );
+        vg.addColorStop(0, 'rgba(0,0,0,0)');
+        vg.addColorStop(1, `rgba(249, 115, 22, ${glowAlpha * 2})`);
+        ctx.fillStyle = vg;
+        ctx.fillRect(0, 0, CONFIG.width, CONFIG.height);
+        ctx.restore();
+    }
+
+    // === SLOW-MOTION OVERLAY ===
+    if (state.slowMotion) {
+        ctx.save();
+        // Leichter Blau-Stich fuer Slow-Mo
+        ctx.fillStyle = `rgba(56, 189, 248, ${0.06 * (1 - (state.slowMotionTimer / 1.8))})`;
+        ctx.fillRect(0, 0, CONFIG.width, CONFIG.height);
+        // Scan-Linien
+        const scanAlpha = 0.05 * (state.slowMotionTimer / 1.8);
+        for (let y = 0; y < CONFIG.height; y += 6) {
+            ctx.fillStyle = `rgba(56, 189, 248, ${scanAlpha})`;
+            ctx.fillRect(0, y, CONFIG.width, 1);
+        }
+        ctx.restore();
+    }
+
+    // === WAVE TRANSITION ===
+    if (state.waveTransition) {
+        ctx.save();
+        const alpha = Math.min(1, state.waveTransitionTimer * 1.5);
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = `rgba(56, 189, 248, ${0.3 * alpha})`;
+        ctx.font = '900 48px Arial';
+        ctx.fillText('WAVE ' + state.currentWave, CONFIG.width / 2, CONFIG.height / 2 - 20);
+        ctx.fillStyle = `rgba(56, 189, 248, ${alpha})`;
+        ctx.font = '900 44px Arial';
+        ctx.fillText('WAVE ' + state.currentWave, CONFIG.width / 2, CONFIG.height / 2 - 20);
+        ctx.fillStyle = `rgba(186, 230, 253, ${0.7 * alpha})`;
+        ctx.font = '800 22px Arial';
+        ctx.fillText('INCOMING', CONFIG.width / 2, CONFIG.height / 2 + 25);
+        ctx.restore();
     }
 
     drawFlash();
@@ -799,7 +924,7 @@ function drawHyperspaceEffect(ctx) {
 
 // ===================== TOUCH CONTROLS =====================
 function drawTouchControls(ctx) {
-    const { fireBtn, bombBtn, pauseBtn } = getTouchButtons();
+    const { fireBtn, bombBtn, shieldBashBtn, pauseBtn } = getTouchButtons();
 
     ctx.save();
 
@@ -904,6 +1029,33 @@ function drawTouchControls(ctx) {
     ctx.fillStyle = 'rgba(250, 204, 21, 0.8)';
     ctx.font = '800 16px Arial';
     ctx.fillText('x' + state.player.bombs, bombBtn.x, bombBtn.y + bombBtn.r + 18);
+
+    // === Shield-Bash Button (nur wenn Schild aktiv) ===
+    if (state.player.shieldTimer > 0) {
+        const bashReady = state.player.shieldBashCooldown <= 0;
+        const bashGradient = ctx.createRadialGradient(shieldBashBtn.x, shieldBashBtn.y, 0, shieldBashBtn.x, shieldBashBtn.y, shieldBashBtn.r);
+        if (bashReady) {
+            bashGradient.addColorStop(0, 'rgba(34, 197, 94, 0.6)');
+            bashGradient.addColorStop(1, 'rgba(34, 197, 94, 0.15)');
+        } else {
+            bashGradient.addColorStop(0, 'rgba(34, 197, 94, 0.25)');
+            bashGradient.addColorStop(1, 'rgba(34, 197, 94, 0.05)');
+        }
+        ctx.fillStyle = bashGradient;
+        ctx.beginPath();
+        ctx.arc(shieldBashBtn.x, shieldBashBtn.y, shieldBashBtn.r, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = bashReady ? 'rgba(34, 197, 94, 0.8)' : 'rgba(34, 197, 94, 0.3)';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.arc(shieldBashBtn.x, shieldBashBtn.y, shieldBashBtn.r, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.fillStyle = bashReady ? '#fff' : 'rgba(34, 197, 94, 0.7)';
+        ctx.font = '900 13px Arial';
+        ctx.fillText('BASH', shieldBashBtn.x, shieldBashBtn.y);
+    }
 
     // === Pause-Button ===
     ctx.fillStyle = 'rgba(148, 163, 184, 0.2)';
@@ -1180,6 +1332,43 @@ function drawHud() {
         ctx.fillStyle = '#ef4444';
         ctx.font = '700 13px Arial';
         ctx.fillText('VERTICAL SCROLL', CONFIG.width - 34, CONFIG.height - 22);
+    }
+
+    // === WAVE INDICATOR (zentriert oben) ===
+    if (!state.bossActive && !state.bossWarning) {
+        ctx.textAlign = 'center';
+        const waveColor = state.overdrive ? '#f97316' : '#38bdf8';
+        ctx.fillStyle = waveColor;
+        ctx.font = '800 14px Arial';
+        ctx.fillText('WAVE ' + state.currentWave + '/' + state.totalWaves, CONFIG.width / 2, 20);
+
+        // Wave Progress Bar
+        const barW = 120;
+        const barH = 4;
+        const barX = CONFIG.width / 2 - barW / 2;
+        const barY = 26;
+        ctx.fillStyle = 'rgba(30, 41, 59, 0.6)';
+        ctx.fillRect(barX, barY, barW, barH);
+        const wavePct = Math.min(1, state.waveKills / state.waveKillsNeeded);
+        ctx.fillStyle = waveColor;
+        ctx.fillRect(barX, barY, barW * wavePct, barH);
+    }
+
+    // === OVERDRIVE INDICATOR ===
+    if (state.overdrive) {
+        ctx.textAlign = 'center';
+        ctx.fillStyle = `rgba(249, 115, 22, ${state.overdriveGlow})`;
+        ctx.font = '900 18px Arial';
+        ctx.fillText('OVERDRIVE', CONFIG.width / 2, 44);
+    }
+
+    // === SHIELD-BASH STATUS ===
+    if (state.player.shieldTimer > 0) {
+        ctx.textAlign = 'left';
+        const bashReady = state.player.shieldBashCooldown <= 0;
+        ctx.fillStyle = bashReady ? '#22c55e' : '#475569';
+        ctx.font = '700 12px Arial';
+        ctx.fillText(bashReady ? 'BASH [E] READY' : 'BASH [E] ' + Math.ceil(state.player.shieldBashCooldown) + 's', 34, CONFIG.height - 8);
     }
 
     // FULLSCREEN HINT (nur Desktop)

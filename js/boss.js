@@ -420,15 +420,20 @@ export function damageBoss(amount) {
 function killBoss() {
     state.score += 5000 + state.stageIndex * 1000;
 
-    // Epische Boss-Kill-Sequenz
-    for (let i = 0; i < 5; i++) {
+    // === BOSS FINISHER: SLOW-MOTION ===
+    state.slowMotion = true;
+    state.slowMotionTimer = 1.8;
+    state.slowMotionFactor = 0.15;
+
+    // Epische Boss-Kill-Sequenz (mehr Explosionen waehrend Slow-Mo)
+    for (let i = 0; i < 8; i++) {
         setTimeout(() => {
             spawnExplosion(
                 state.boss ? state.boss.x + (Math.random() - 0.5) * 200 : CONFIG.width / 2,
                 state.boss ? state.boss.y + (Math.random() - 0.5) * 150 : CONFIG.height / 2,
-                2 + Math.random()
+                2 + Math.random() * 1.5
             );
-        }, i * 200);
+        }, i * 150);
     }
 
     // Boss loeschen

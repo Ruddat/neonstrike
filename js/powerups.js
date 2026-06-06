@@ -5,7 +5,7 @@ import { audio } from './audio.js';
 import { isVertical, isPowerupOutOfBounds } from './direction.js';
 
 
-const TYPES = ['spread', 'plasma', 'rapid', 'shield', 'life', 'railgun', 'weaponUp', 'bomb'];
+const TYPES = ['spread', 'plasma', 'rapid', 'shield', 'life', 'railgun', 'weaponUp', 'bomb', 'ionCannon', 'voidBeam'];
 
 export function maybeDropPowerup(x, y) {
     // Hoehere Drop-Rate fuer mehr Katakis-Feeling
@@ -21,6 +21,8 @@ export function maybeDropPowerup(x, y) {
         shield: 2,
         life: 1,
         bomb: 2,
+        ionCannon: 0.5,   // Selten!
+        voidBeam: 0.3,    // Sehr selten!
     };
 
     const pool = [];
@@ -124,6 +126,23 @@ export function applyPowerup(type) {
         if (player.weaponLevel < 2) player.weaponLevel = 2;
     }
 
+    // === SECRET WEAPONS ===
+    if (type === 'ionCannon') {
+        player.weaponType = 'ionCannon';
+        player.weaponTimer = 6; // Kurz aber verheerend
+        if (player.weaponLevel < 3) player.weaponLevel = 3;
+        state.screenFlash = 0.5;
+        state.screenShake = 12;
+    }
+
+    if (type === 'voidBeam') {
+        player.weaponType = 'voidBeam';
+        player.weaponTimer = 5; // Sehr kurz aber extrem stark
+        if (player.weaponLevel < 3) player.weaponLevel = 3;
+        state.screenFlash = 0.6;
+        state.screenShake = 16;
+    }
+
     // Bomb Fragment: Sammle 3 = 1 neue Bombe
     if (type === 'bomb') {
         player.bombFragments++;
@@ -215,6 +234,8 @@ function getPowerupColor(type) {
     if (type === 'railgun') return '#f43f5e';
     if (type === 'weaponUp') return '#f97316';
     if (type === 'bomb') return '#fb923c';
+    if (type === 'ionCannon') return '#06b6d4';   // Cyan-Blau
+    if (type === 'voidBeam') return '#7c3aed';    // Dunkles Lila
     return '#ffffff';
 }
 
@@ -227,5 +248,7 @@ function getPowerupLabel(type) {
     if (type === 'railgun') return 'G';
     if (type === 'weaponUp') return 'UP';
     if (type === 'bomb') return 'B';
+    if (type === 'ionCannon') return 'ION';
+    if (type === 'voidBeam') return 'VD';
     return '?';
 }
