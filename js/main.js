@@ -1,5 +1,6 @@
 import { CONFIG } from './config.js';
 import { state } from './state.js';
+import { applyIngamePolish } from './ingame-polish.js';
 import { initInput, consumePause, consumeFullscreen, touch, getTouchButtons, isMobile } from './input.js';
 import { isVertical } from './direction.js';
 import {
@@ -471,6 +472,8 @@ function render() {
                 ctx.font = '800 20px Arial';
                 ctx.fillText('VERTICAL SCROLL — 1945 STYLE', CONFIG.width / 2, CONFIG.height / 2 + 65);
             }
+
+
             ctx.restore();
         }
     }
@@ -485,15 +488,17 @@ function render() {
         drawVictoryOverlay();
     }
 
-    drawHud();
-    drawBossHud(ctx);
-    drawBullets(ctx);
-    drawEnemyBullets(ctx);
-    drawEnemies(ctx);
-    drawBoss(ctx);
-    drawEffects(ctx);
-    drawPowerups(ctx);
-    drawPlayer(ctx);
+// drawHud(); // altes HUD deaktiviert
+drawBossHud(ctx);
+drawBullets(ctx);
+drawEnemyBullets(ctx);
+drawEnemies(ctx);
+drawBoss(ctx);
+drawEffects(ctx);
+drawPowerups(ctx);
+drawPlayer(ctx);
+
+applyIngamePolish(performance.now());
 
     // Hyperspace Warp Effect (ueber alles)
     if (state.hyperspaceJump) {
@@ -557,6 +562,8 @@ function render() {
     if (touch.active) {
         drawTouchControls(ctx);
     }
+
+applyIngamePolish(performance.now());
 
     ctx.restore();
 }

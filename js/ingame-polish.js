@@ -232,9 +232,7 @@ function drawCleanHud() {
     ctx.restore();
 }
 
-function polishLoop(time) {
-    requestAnimationFrame(polishLoop);
-
+export function applyIngamePolish(time = performance.now()) {
     if (!ctx) return;
     if (!state.running) return;
     if (state.nameEntry || state.gameOver || state.victory) return;
@@ -242,8 +240,4 @@ function polishLoop(time) {
     tagEnemyBullets();
     drawPlayerReadabilityRing(time);
     drawCleanHud();
-}
-
-if (ctx) {
-    requestAnimationFrame(polishLoop);
 }
