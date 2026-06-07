@@ -7,13 +7,17 @@ import { startBossWarning } from './boss.js';
 import { spawnExplosion, spawnHitSpark } from './effects.js';
 
 const asteroids = [];
+const laserGates = [];
 let spawnTimer = 0;
+let laserGateTimer = 2.2;
 let lastTime = 0;
 let lastStageIndex = -1;
 
 function resetHazardsForStage() {
     asteroids.length = 0;
+    laserGates.length = 0;
     spawnTimer = 0.4;
+    laserGateTimer = 2.2;
     lastTime = 0;
     lastStageIndex = state.stageIndex;
 }
@@ -38,6 +42,10 @@ function isMeteorField(stage, mods) {
     return Boolean(mods.meteorField) || /Meteor Belt/i.test(stage.name || '');
 }
 
+function isLaserGateField(stage, mods) {
+    return Boolean(mods.laserGates) || /Cyber Grid/i.test(stage.name || '');
+}
+
 function spawnAsteroid(mods) {
     const vertical = isVertical();
     const sizeRoll = Math.random();
@@ -59,6 +67,27 @@ function spawnAsteroid(mods) {
     };
 
     asteroids.push(asteroid);
+}
+
+function spawnLaserGate(mods) {
+    const vertical = isVertical();
+    const gapSize = mods.gateGapSize || 190;
+    const warningTime = mods.gateWarningTime || 1.05;
+    const activeTime = mods.gateActiveTime || 1.6;
+    const speed = mods.gateSpeed || 145;
+
+    laserGates.push({
+        orientation: vertical ? 'horizontal' : 'vertical',
+        x: vertical ? 0 : CONFIG.width + 70,
+        y: vertical ? -70 : 0,
+        gapCenter: vertical ? rand(180, CONFIG.width - 180) : rand(130, CONFIG.height - 130),
+        gapSize,
+        warningTime,
+        activeTime,
+        timer: warningTime + activeTime,
+        speed,
+        hasHitPlayer: false,
+    });
 }
 
 function isOutOfBounds(asteroid) {
@@ -166,7 +195,6 @@ function updateAsteroids(dt, mods, meteorField) {
             continue;
         }
 
-        // Player bullets vs asteroid
         for (let j = state.bullets.length - 1; j >= 0; j--) {
             const bullet = state.bullets[j];
             if (!circleHit(bullet.x, bullet.y, bullet.r, asteroid.x, asteroid.y, asteroid.r * 0.82)) continue;
@@ -193,6 +221,29 @@ function updateAsteroids(dt, mods, meteorField) {
     }
 }
 
+function updateLaserGates(dt, mods, laserField) {
+    if (!laserField) return;
+
+    laserGateTimer -= dt;
+    if (laserGateTimer <= 0 && !state.bossActive && !state.bossWarning) {
+        spawnLaserGate(mods);
+        laserGateTimer = (mods.gateInterval || 4.6) + rand(0, 1.25);
+    }
+
+    for (let i = laserGates.length - 1; i >= 0; i--) {
+        const gate = laserGates[i];
+        gate.timer -= dt;
+
+        if (gate.orientation === 'vertical') {
+            gate.x -= gate.speed * dt;
+            if (gate.x < -90 || gate.timer <= 0) laserGates.splice(i, 1);
+        } else {
+            gate.y += gate.speed * dt;
+            if (gate.y > CONFIG.height + 90 || gate.timer <= 0) laserGates.splice(i, 1);
+        }
+    }
+}
+
 function checkPlayerAsteroidCollision() {
     if (state.player.invulnerable > 0) return;
 
@@ -205,6 +256,36 @@ function checkPlayerAsteroidCollision() {
         asteroids.splice(i, 1);
         damagePlayerFromHazard();
         break;
+    }
+}
+
+function checkPlayerLaserCollision() {
+    if (state.player.invulnerable > 0) return;
+
+    const player = state.player;
+    for (const gate of laserGates) {
+        const active = gate.timer <= gate.activeTime;
+        if (!active || gate.hasHitPlayer) continue;
+
+        const halfGap = gate.gapSize / 2;
+        let hit = false;
+
+        if (gate.orientation === 'vertical') {
+            const nearBeam = Math.abs(player.x - gate.x) < 28;
+            const inBlockedArea = Math.abs(player.y - gate.gapCenter) > halfGap - 18;
+            hit = nearBeam && inBlockedArea;
+        } else {
+            const nearBeam = Math.abs(player.y - gate.y) < 28;
+            const inBlockedArea = Math.abs(player.x - gate.gapCenter) > halfGap - 20;
+            hit = nearBeam && inBlockedArea;
+        }
+
+        if (hit) {
+            gate.hasHitPlayer = true;
+            spawnExplosion(player.x, player.y, 0.85);
+            damagePlayerFromHazard();
+            break;
+        }
     }
 }
 
@@ -252,11 +333,51 @@ function drawAsteroid(ctx, asteroid) {
     ctx.restore();
 }
 
+function drawLaserSegment(ctx, x1, y1, x2, y2, active, pulse) {
+    ctx.save();
+    ctx.strokeStyle = active ? `rgba(255, 43, 214, ${0.72 + pulse * 0.24})` : `rgba(250, 204, 21, ${0.32 + pulse * 0.22})`;
+    ctx.lineWidth = active ? 10 : 4;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+
+    ctx.strokeStyle = active ? 'rgba(248,250,252,.92)' : 'rgba(248,250,252,.45)';
+    ctx.lineWidth = active ? 2 : 1;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+    ctx.restore();
+}
+
+function drawLaserGate(ctx, gate, time) {
+    const active = gate.timer <= gate.activeTime;
+    const pulse = 0.5 + Math.sin(time * 0.025) * 0.5;
+    const halfGap = gate.gapSize / 2;
+
+    if (gate.orientation === 'vertical') {
+        const x = gate.x;
+        const y1 = Math.max(0, gate.gapCenter - halfGap);
+        const y2 = Math.min(CONFIG.height, gate.gapCenter + halfGap);
+        drawLaserSegment(ctx, x, 0, x, y1, active, pulse);
+        drawLaserSegment(ctx, x, y2, x, CONFIG.height, active, pulse);
+    } else {
+        const y = gate.y;
+        const x1 = Math.max(0, gate.gapCenter - halfGap);
+        const x2 = Math.min(CONFIG.width, gate.gapCenter + halfGap);
+        drawLaserSegment(ctx, 0, y, x1, y, active, pulse);
+        drawLaserSegment(ctx, x2, y, CONFIG.width, y, active, pulse);
+    }
+}
+
 export function updateAndDrawHazards(ctx, time = performance.now()) {
     const stage = getStage(state.stageIndex);
     const mods = getStageModifiers(stage);
     const meteorField = isMeteorField(stage, mods);
-    const enabled = (Boolean(mods.asteroidDrift) || meteorField) && ((mods.asteroidDensity || 0) > 0 || meteorField);
+    const laserField = isLaserGateField(stage, mods);
+    const asteroidEnabled = (Boolean(mods.asteroidDrift) || meteorField) && ((mods.asteroidDensity || 0) > 0 || meteorField);
+    const enabled = asteroidEnabled || laserField;
 
     if (state.stageIndex !== lastStageIndex || !enabled) {
         resetHazardsForStage();
@@ -267,11 +388,17 @@ export function updateAndDrawHazards(ctx, time = performance.now()) {
     lastTime = time;
 
     if (!state.hyperspaceJump && !state.stageTransition && state.running && !state.paused) {
-        updateAsteroids(dt, mods, meteorField);
+        if (asteroidEnabled) updateAsteroids(dt, mods, meteorField);
+        updateLaserGates(dt, mods, laserField);
         checkPlayerAsteroidCollision();
+        checkPlayerLaserCollision();
     }
 
     for (const asteroid of asteroids) {
         drawAsteroid(ctx, asteroid);
+    }
+
+    for (const gate of laserGates) {
+        drawLaserGate(ctx, gate, time);
     }
 }
