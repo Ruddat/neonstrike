@@ -2,6 +2,8 @@ import { CONFIG } from './config.js';
 import { state } from './state.js';
 import { assets } from './assets.js';
 import { getStage } from './stages.js';
+import { getStageModifiers, pickEnemyType } from './stage-modifiers.js';
+
 import {
     isVertical,
     spawnX, spawnY,
@@ -58,6 +60,7 @@ export function updateEnemies(dt) {
             : enemy.x < CONFIG.width - 90 && enemy.type !== 'kamikaze' && enemy.type !== 'wobble';
 
         if (enemy.fireTimer <= 0 && canFire) {
+
             fireEnemyBullet(enemy, speedMul);
         }
 
@@ -157,6 +160,11 @@ function updateEnemyMovement(enemy, dt, speedMul) {
 }
 
 function fireEnemyBullet(enemy, speedMul) {
+  const stage = getStage(state.stageIndex);
+const mods = getStageModifiers(stage);
+const bulletSpeedMul = speedMul * mods.enemyBulletSpeed;
+  
+  
     if (enemy.type === 'sniper') {
         // Sniper: Gezielter Schuss
         const dx = state.player.x - enemy.x;
@@ -165,24 +173,25 @@ function fireEnemyBullet(enemy, speedMul) {
         state.enemyBullets.push({
             x: isVertical() ? enemy.x : enemy.x - 32,
             y: isVertical() ? enemy.y + 32 : enemy.y,
-            vx: (dx / len) * 380 * speedMul,
-            vy: (dy / len) * 380 * speedMul,
+vx: (dx / len) * 380 * bulletSpeedMul,
+vy: (dy / len) * 380 * bulletSpeedMul,
             r: 6,
             color: '#fca5a5',
         });
         enemy.fireTimer = 1.6;
-    } else if (enemy.type === 'heavy') {
-        // Heavy: Triple Shot
-        for (let i = -1; i <= 1; i++) {
-            state.enemyBullets.push({
-                x: isVertical() ? enemy.x + i * 18 : enemy.x - 32,
-                y: isVertical() ? enemy.y + 32 : enemy.y + i * 18,
-                vx: enemyBulletBaseVx(speedMul) + (isVertical() ? i * 50 * speedMul : 0),
-                vy: enemyBulletBaseVy(speedMul) + (isVertical() ? 0 : i * 50 * speedMul),
-                r: 6,
-            });
-        }
-        enemy.fireTimer = 1.4;
+} else if (enemy.type === 'heavy') {
+    // Heavy: Triple Shot
+    for (let i = -1; i <= 1; i++) {
+        state.enemyBullets.push({
+            x: isVertical() ? enemy.x + i * 18 : enemy.x - 32,
+            y: isVertical() ? enemy.y + 32 : enemy.y + i * 18,
+            vx: enemyBulletBaseVx(bulletSpeedMul) + (isVertical() ? i * 50 * bulletSpeedMul : 0),
+            vy: enemyBulletBaseVy(bulletSpeedMul) + (isVertical() ? 0 : i * 50 * bulletSpeedMul),
+            r: 6,
+            color: '#fca5a5',
+        });
+    }
+    enemy.fireTimer = 1.4;
     } else if (enemy.type === 'derp') {
         // Derp: Inaccurate shots with random spread
         const baseAngle = isVertical()
@@ -223,8 +232,8 @@ function fireEnemyBullet(enemy, speedMul) {
         state.enemyBullets.push({
             x: isVertical() ? enemy.x : enemy.x - 32,
             y: isVertical() ? enemy.y + 32 : enemy.y,
-            vx: enemyBulletBaseVx(speedMul),
-            vy: enemyBulletBaseVy(speedMul) + (isVertical() ? 0 : Math.sin(enemy.t * 2) * 70 * speedMul),
+vx: enemyBulletBaseVx(bulletSpeedMul),
+vy: enemyBulletBaseVy(bulletSpeedMul) + (isVertical() ? 0 : Math.sin(enemy.t * 2) * 70 * bulletSpeedMul),
             r: 5,
         });
         enemy.fireTimer = 2.1;
@@ -523,19 +532,8 @@ function spawnSingleEnemy(speedMul) {
     const hpBonus = stage.enemyHpBonus || 0;
 
     // At higher levels, also spawn derp/drunk/wobble as single enemies
-    let type;
-    const roll = Math.random();
-    if (state.stageIndex >= 3 && roll > 0.88) {
-        type = 'derp';
-    } else if (state.stageIndex >= 5 && roll > 0.82) {
-        type = 'drunk';
-    } else if (state.stageIndex >= 7 && roll > 0.78) {
-        type = 'wobble';
-    } else if (roll > 0.72) {
-        type = 'heavy';
-    } else {
-        type = 'drone';
-    }
+    const mods = getStageModifiers(stage);
+    const type = pickEnemyType(stage, state.stageIndex);
 
     const vert = isVertical();
     const pos = vert
@@ -550,7 +548,18 @@ function spawnSingleEnemy(speedMul) {
         baseY: vert ? undefined : pos,
         w: type === 'heavy' ? 76 : type === 'wobble' ? 64 : type === 'derp' ? 44 : 52,
         h: type === 'heavy' ? 44 : type === 'wobble' ? 64 : type === 'derp' ? 44 : 30,
-        speed: (type === 'heavy' ? 125 : type === 'wobble' ? 70 : type === 'derp' ? 120 : type === 'drunk' ? 130 : 190 + Math.random() * 55) * speedMul,
+
+        speed: (
+            type === 'heavy'
+                ? 125 * mods.heavySpeedBonus
+                : type === 'wobble'
+                    ? 70
+                    : type === 'derp'
+                        ? 120
+                        : type === 'drunk'
+                            ? 130
+                            : (190 + Math.random() * 55) * mods.droneSpeedBonus
+        ) * speedMul,
         points: type === 'heavy' ? 360 + state.stageIndex * 40 : type === 'wobble' ? 180 + state.stageIndex * 15 : type === 'derp' ? 80 + state.stageIndex * 8 : type === 'drunk' ? 120 + state.stageIndex * 12 : 150 + state.stageIndex * 15,
         wave: type === 'heavy' ? 18 : type === 'wobble' ? 40 : 34,
         t: Math.random() * 10,
