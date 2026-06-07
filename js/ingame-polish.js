@@ -2,6 +2,7 @@ import { CONFIG } from './config.js';
 import { state } from './state.js';
 import { getStage } from './stages.js';
 import { isVertical } from './direction.js';
+import { updateAndDrawHazards } from './hazards.js';
 
 const canvas = document.getElementById('game');
 const ctx = canvas?.getContext('2d');
@@ -85,7 +86,7 @@ function tagEnemyBullets() {
         if (bullet._polished) continue;
 
         // Heavy Triple-Shots haben r >= 6 und keine eigene Farbe.
-        // Dadurch werden sie klar rot statt wie normale grüne Kugeln.
+        // Dadurch werden sie klar rot statt wie normale gruene Kugeln.
         if (!bullet.color && bullet.r >= 6) {
             bullet.color = '#fca5a5';
         }
@@ -137,7 +138,7 @@ function drawCleanHud() {
 
     ctx.save();
 
-    // Altes linkes HUD optisch überdecken und sauber neu zeichnen
+    // Altes linkes HUD optisch ueberdecken und sauber neu zeichnen
     drawPanel(22, 18, 236, 180, 0.70);
 
     label('SCORE', 42, 34);
@@ -184,7 +185,7 @@ function drawCleanHud() {
         wpnColor
     );
 
-    // Wave mittig oben größer und lesbarer
+    // Wave mittig oben groesser und lesbarer
     if (!state.bossActive && !state.bossWarning) {
         drawPanel(CONFIG.width / 2 - 98, 16, 196, 48, 0.56);
 
@@ -238,6 +239,7 @@ export function applyIngamePolish(time = performance.now()) {
     if (state.nameEntry || state.gameOver || state.victory) return;
 
     tagEnemyBullets();
+    updateAndDrawHazards(ctx, time);
     drawPlayerReadabilityRing(time);
     drawCleanHud();
 }
