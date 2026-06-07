@@ -12,11 +12,11 @@ export const audio = {
 
         this.ingameMusic = new Audio('assets/audio/ingame-theme.mp3');
         this.ingameMusic.loop = true;
-        this.ingameMusic.volume = 0.38;
+        this.ingameMusic.volume = 0.45;
 
         this.verticalMusic = new Audio('assets/audio/vertical-theme.mp3');
         this.verticalMusic.loop = true;
-        this.verticalMusic.volume = 0.40;
+        this.verticalMusic.volume = 0.55;
 
         this.bossMusic = new Audio('assets/audio/boss-theme.mp3');
         this.bossMusic.loop = true;
