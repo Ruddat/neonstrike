@@ -95,6 +95,84 @@ function tagEnemyBullets() {
     }
 }
 
+function ensureEnemyPolishState(enemy) {
+    if (!enemy._polishSeen) {
+        enemy._polishSeen = true;
+        enemy._polishSpawnFlash = enemy.type === 'heavy' ? 1.0 : 0;
+        enemy._polishMaxHp = Math.max(enemy.hp || 1, enemy._polishMaxHp || 1);
+    }
+
+    if (enemy.type === 'heavy') {
+        enemy._polishMaxHp = Math.max(enemy._polishMaxHp || 1, enemy.hp || 1);
+        enemy._polishSpawnFlash = Math.max(0, (enemy._polishSpawnFlash || 0) - 0.025);
+    }
+}
+
+function drawHeavyThreatMarkers(time) {
+    const pulse = 0.5 + Math.sin(time * 0.012) * 0.5;
+
+    for (const enemy of state.enemies) {
+        ensureEnemyPolishState(enemy);
+        if (enemy.type !== 'heavy') continue;
+
+        const maxHp = Math.max(enemy._polishMaxHp || enemy.hp || 1, 1);
+        const hpPct = clamp01((enemy.hp || 0) / maxHp);
+        const flash = enemy._polishSpawnFlash || 0;
+
+        ctx.save();
+        ctx.translate(enemy.x, enemy.y);
+
+        // Spawn-/Threat-Glow: kurz rot-orange beim Auftauchen, danach dezente Markierung.
+        const glowAlpha = Math.max(0.10 + pulse * 0.08, flash * 0.42);
+        ctx.fillStyle = `rgba(249, 115, 22, ${glowAlpha})`;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, enemy.w * 0.92 + flash * 28, enemy.h * 0.95 + flash * 20, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Zielklammern links/rechts, damit Heavy sofort als Prioritaetsziel lesbar ist.
+        ctx.strokeStyle = flash > 0.25 ? 'rgba(251, 146, 60, .95)' : 'rgba(251, 146, 60, .55)';
+        ctx.lineWidth = 2;
+        const bx = enemy.w * 0.58;
+        const by = enemy.h * 0.55;
+        const len = 12;
+
+        ctx.beginPath();
+        ctx.moveTo(-bx, -by + len);
+        ctx.lineTo(-bx, -by);
+        ctx.lineTo(-bx + len, -by);
+        ctx.moveTo(-bx, by - len);
+        ctx.lineTo(-bx, by);
+        ctx.lineTo(-bx + len, by);
+        ctx.moveTo(bx - len, -by);
+        ctx.lineTo(bx, -by);
+        ctx.lineTo(bx, -by + len);
+        ctx.moveTo(bx - len, by);
+        ctx.lineTo(bx, by);
+        ctx.lineTo(bx, by - len);
+        ctx.stroke();
+
+        // HP-Bar direkt ueber dem Heavy.
+        const barW = Math.max(54, enemy.w * 1.05);
+        const barH = 6;
+        const barY = -enemy.h * 0.72 - 18;
+
+        ctx.fillStyle = 'rgba(2, 6, 23, 0.82)';
+        ctx.fillRect(-barW / 2 - 2, barY - 2, barW + 4, barH + 4);
+
+        ctx.fillStyle = 'rgba(148, 163, 184, 0.34)';
+        ctx.fillRect(-barW / 2, barY, barW, barH);
+
+        ctx.fillStyle = hpPct > 0.55 ? '#f97316' : hpPct > 0.25 ? '#fb923c' : '#ef4444';
+        ctx.fillRect(-barW / 2, barY, barW * hpPct, barH);
+
+        ctx.strokeStyle = 'rgba(248,250,252,.35)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(-barW / 2, barY, barW, barH);
+
+        ctx.restore();
+    }
+}
+
 function drawPlayerReadabilityRing(time) {
     const player = state.player;
     const pulse = 0.5 + Math.sin(time * 0.008) * 0.5;
@@ -240,6 +318,7 @@ export function applyIngamePolish(time = performance.now()) {
 
     tagEnemyBullets();
     updateAndDrawHazards(ctx, time);
+    drawHeavyThreatMarkers(time);
     drawPlayerReadabilityRing(time);
     drawCleanHud();
 }
