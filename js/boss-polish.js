@@ -1,5 +1,6 @@
 import { CONFIG } from './config.js';
 import { state } from './state.js';
+import { isVertical } from './direction.js';
 
 let seenBoss = null;
 let lastBossHp = 0;
@@ -20,6 +21,12 @@ function phaseColor(phase) {
     if (phase >= 3) return '#ef4444';
     if (phase === 2) return '#f97316';
     return '#facc15';
+}
+
+function rotateWithVerticalStage(ctx) {
+    if (isVertical()) {
+        ctx.rotate(-Math.PI / 2);
+    }
 }
 
 function roundRectPath(ctx, x, y, w, h, r) {
@@ -117,6 +124,7 @@ function drawBossHitFlash(ctx, boss, time) {
 
     ctx.save();
     ctx.translate(boss.x, boss.y);
+    rotateWithVerticalStage(ctx);
 
     ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
     ctx.beginPath();
