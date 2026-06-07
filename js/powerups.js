@@ -3,13 +3,18 @@ import { state } from './state.js';
 import { clamp } from './utils.js';
 import { audio } from './audio.js';
 import { isVertical, isPowerupOutOfBounds } from './direction.js';
-
+import { getStage } from './stages.js';
+import { getStageModifiers } from './stage-modifiers.js';
 
 const TYPES = ['spread', 'plasma', 'rapid', 'shield', 'life', 'railgun', 'weaponUp', 'bomb', 'ionCannon', 'voidBeam'];
 
 export function maybeDropPowerup(x, y) {
-    // Hoehere Drop-Rate fuer mehr Katakis-Feeling
-    if (Math.random() > 0.28) return;
+    const stage = getStage(state.stageIndex);
+    const mods = getStageModifiers(stage);
+    const dropChance = mods.powerupChance;
+
+    // Kein Drop? Dann direkt raus.
+    if (Math.random() > dropChance) return;
 
     // Gewichtete Drop-Tabelle
     const weights = {
@@ -21,15 +26,21 @@ export function maybeDropPowerup(x, y) {
         shield: 2,
         life: 1,
         bomb: 2,
-        ionCannon: 0.5,   // Selten!
-        voidBeam: 0.3,    // Sehr selten!
+        ionCannon: 0.5,
+        voidBeam: 0.3,
     };
 
     const pool = [];
+
     for (const type of TYPES) {
-        const w = weights[type] || 1;
-        for (let i = 0; i < w; i++) pool.push(type);
+        const weight = weights[type] || 1;
+
+        for (let i = 0; i < weight; i++) {
+            pool.push(type);
+        }
     }
+
+    if (pool.length === 0) return;
 
     const type = pool[Math.floor(Math.random() * pool.length)];
 
