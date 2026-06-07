@@ -100,11 +100,76 @@ function ensureEnemyPolishState(enemy) {
         enemy._polishSeen = true;
         enemy._polishSpawnFlash = enemy.type === 'heavy' ? 1.0 : 0;
         enemy._polishMaxHp = Math.max(enemy.hp || 1, enemy._polishMaxHp || 1);
+        enemy._polishLastHp = enemy.hp || 0;
+        enemy._polishHitFlash = 0;
     }
+
+    const currentHp = enemy.hp || 0;
+    const lastHp = enemy._polishLastHp ?? currentHp;
+
+    if (currentHp < lastHp) {
+        const damage = Math.max(1, lastHp - currentHp);
+        const baseFlash = enemy.type === 'heavy' ? 1.0 : 0.78;
+        enemy._polishHitFlash = Math.min(1.35, baseFlash + damage * 0.08);
+        enemy._polishHitPulse = 1.0;
+    }
+
+    enemy._polishLastHp = currentHp;
+    enemy._polishHitFlash = Math.max(0, (enemy._polishHitFlash || 0) - 0.085);
+    enemy._polishHitPulse = Math.max(0, (enemy._polishHitPulse || 0) - 0.12);
 
     if (enemy.type === 'heavy') {
         enemy._polishMaxHp = Math.max(enemy._polishMaxHp || 1, enemy.hp || 1);
         enemy._polishSpawnFlash = Math.max(0, (enemy._polishSpawnFlash || 0) - 0.025);
+    }
+}
+
+function drawEnemyHitFeedback() {
+    for (const enemy of state.enemies) {
+        ensureEnemyPolishState(enemy);
+
+        const flash = enemy._polishHitFlash || 0;
+        if (flash <= 0) continue;
+
+        const pulse = enemy._polishHitPulse || 0;
+        const alpha = Math.min(0.72, flash * 0.55);
+        const scale = 1 + pulse * 0.18;
+        const radiusX = enemy.w * (enemy.type === 'heavy' ? 0.72 : 0.68) * scale;
+        const radiusY = enemy.h * (enemy.type === 'heavy' ? 0.82 : 0.95) * scale;
+
+        ctx.save();
+        ctx.translate(enemy.x, enemy.y);
+
+        if (isVertical()) {
+            // Gegner-Sprites selbst sind nicht rotiert, aber das Overlay bleibt sauber am Objekt.
+        }
+
+        // Heller Impact-Kern direkt ueber dem Gegner.
+        ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, radiusX, radiusY, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Orange Kante fuer Heavy / starke Treffer.
+        ctx.strokeStyle = enemy.type === 'heavy'
+            ? `rgba(251, 146, 60, ${Math.min(0.95, flash)})`
+            : `rgba(56, 189, 248, ${Math.min(0.7, flash * 0.75)})`;
+        ctx.lineWidth = enemy.type === 'heavy' ? 3 : 2;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, radiusX * 1.06, radiusY * 1.08, 0, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Kleiner Kreuz-Flash, macht Treffer bei schnellen Gegnern besser lesbar.
+        ctx.strokeStyle = `rgba(248, 250, 252, ${Math.min(0.85, flash * 0.7)})`;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(-enemy.w * 0.35, 0);
+        ctx.lineTo(enemy.w * 0.35, 0);
+        ctx.moveTo(0, -enemy.h * 0.5);
+        ctx.lineTo(0, enemy.h * 0.5);
+        ctx.stroke();
+
+        ctx.restore();
     }
 }
 
@@ -318,6 +383,7 @@ export function applyIngamePolish(time = performance.now()) {
 
     tagEnemyBullets();
     updateAndDrawHazards(ctx, time);
+    drawEnemyHitFeedback();
     drawHeavyThreatMarkers(time);
     drawPlayerReadabilityRing(time);
     drawCleanHud();
