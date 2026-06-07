@@ -488,17 +488,19 @@ function render() {
         drawVictoryOverlay();
     }
 
-// drawHud(); // altes HUD deaktiviert
-drawBossHud(ctx);
-drawBullets(ctx);
-drawEnemyBullets(ctx);
-drawEnemies(ctx);
-drawBoss(ctx);
-drawEffects(ctx);
-drawPowerups(ctx);
-drawPlayer(ctx);
+    // Altes HUD deaktiviert. Neues HUD kommt ueber applyIngamePolish().
+    // drawHud();
 
-applyIngamePolish(performance.now());
+    drawBossHud(ctx);
+    drawBullets(ctx);
+    drawEnemyBullets(ctx);
+    drawEnemies(ctx);
+    drawBoss(ctx);
+    drawEffects(ctx);
+    drawPowerups(ctx);
+    drawPlayer(ctx);
+
+    applyIngamePolish(performance.now());
 
     // Hyperspace Warp Effect (ueber alles)
     if (state.hyperspaceJump) {
