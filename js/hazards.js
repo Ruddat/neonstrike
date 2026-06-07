@@ -3,6 +3,7 @@ import { state } from './state.js';
 import { getStage } from './stages.js';
 import { getStageModifiers } from './stage-modifiers.js';
 import { isVertical } from './direction.js';
+import { startBossWarning } from './boss.js';
 import { spawnExplosion, spawnHitSpark } from './effects.js';
 
 const asteroids = [];
@@ -31,6 +32,10 @@ function makeRockShape(points) {
         });
     }
     return shape;
+}
+
+function isMeteorField(stage, mods) {
+    return Boolean(mods.meteorField) || /Meteor Belt/i.test(stage.name || '');
 }
 
 function spawnAsteroid(mods) {
@@ -118,13 +123,33 @@ function splitAsteroid(asteroid) {
     }
 }
 
-function updateAsteroids(dt, mods) {
-    const density = Math.max(0, mods.asteroidDensity || 0);
+function countAsteroidAsObjective(asteroid, meteorField) {
+    if (!meteorField || state.bossActive || state.bossWarning) return;
+
+    state.killsThisStage++;
+    state.waveKills++;
+
+    if (state.waveKills >= state.waveKillsNeeded && state.currentWave < state.totalWaves) {
+        state.currentWave++;
+        state.waveKills = 0;
+        state.waveKillsNeeded = 8 + state.stageIndex + state.currentWave * 2;
+        state.waveTransition = true;
+        state.waveTransitionTimer = 1.5;
+        state.screenFlash = Math.max(state.screenFlash, 0.18);
+    }
+
+    if (state.killsThisStage >= state.killsForBoss && !state.bossActive) {
+        startBossWarning();
+    }
+}
+
+function updateAsteroids(dt, mods, meteorField) {
+    const density = Math.max(0, meteorField ? Math.max(mods.asteroidDensity || 0, 0.82) : (mods.asteroidDensity || 0));
     if (density > 0) {
         spawnTimer -= dt;
-        const interval = Math.max(0.32, 1.75 - density * 1.35);
+        const interval = Math.max(meteorField ? 0.22 : 0.32, 1.75 - density * 1.35);
         if (spawnTimer <= 0) {
-            spawnAsteroid(mods);
+            spawnAsteroid({ ...mods, asteroidDensity: density });
             spawnTimer = interval + rand(0, interval * 0.55);
         }
     }
@@ -158,6 +183,7 @@ function updateAsteroids(dt, mods) {
             if (asteroid.hp <= 0) {
                 spawnExplosion(asteroid.x, asteroid.y, Math.max(0.65, asteroid.r / 32));
                 state.score += Math.round(30 + asteroid.r * 2);
+                countAsteroidAsObjective(asteroid, meteorField);
                 splitAsteroid(asteroid);
                 asteroids.splice(i, 1);
             }
@@ -229,7 +255,8 @@ function drawAsteroid(ctx, asteroid) {
 export function updateAndDrawHazards(ctx, time = performance.now()) {
     const stage = getStage(state.stageIndex);
     const mods = getStageModifiers(stage);
-    const enabled = Boolean(mods.asteroidDrift) && (mods.asteroidDensity || 0) > 0;
+    const meteorField = isMeteorField(stage, mods);
+    const enabled = (Boolean(mods.asteroidDrift) || meteorField) && ((mods.asteroidDensity || 0) > 0 || meteorField);
 
     if (state.stageIndex !== lastStageIndex || !enabled) {
         resetHazardsForStage();
@@ -240,7 +267,7 @@ export function updateAndDrawHazards(ctx, time = performance.now()) {
     lastTime = time;
 
     if (!state.hyperspaceJump && !state.stageTransition && state.running && !state.paused) {
-        updateAsteroids(dt, mods);
+        updateAsteroids(dt, mods, meteorField);
         checkPlayerAsteroidCollision();
     }
 
