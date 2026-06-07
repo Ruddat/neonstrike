@@ -1,3 +1,5 @@
+import './level-design.js';
+
 const shell = document.querySelector('.game-shell');
 const fullscreenButton = document.getElementById('fullscreenBtn');
 
