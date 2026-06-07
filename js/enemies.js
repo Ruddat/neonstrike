@@ -160,84 +160,107 @@ function updateEnemyMovement(enemy, dt, speedMul) {
 }
 
 function fireEnemyBullet(enemy, speedMul) {
-  const stage = getStage(state.stageIndex);
-const mods = getStageModifiers(stage);
-const bulletSpeedMul = speedMul * mods.enemyBulletSpeed;
-  
-  
+    const stage = getStage(state.stageIndex);
+    const mods = getStageModifiers(stage);
+    const bulletSpeedMul = speedMul * mods.enemyBulletSpeed;
+
     if (enemy.type === 'sniper') {
         // Sniper: Gezielter Schuss
         const dx = state.player.x - enemy.x;
         const dy = state.player.y - enemy.y;
         const len = Math.hypot(dx, dy) || 1;
+
         state.enemyBullets.push({
             x: isVertical() ? enemy.x : enemy.x - 32,
             y: isVertical() ? enemy.y + 32 : enemy.y,
-vx: (dx / len) * 380 * bulletSpeedMul,
-vy: (dy / len) * 380 * bulletSpeedMul,
+            vx: (dx / len) * 380 * bulletSpeedMul,
+            vy: (dy / len) * 380 * bulletSpeedMul,
             r: 6,
             color: '#fca5a5',
         });
+
         enemy.fireTimer = 1.6;
-} else if (enemy.type === 'heavy') {
-    // Heavy: Triple Shot
-    for (let i = -1; i <= 1; i++) {
-        state.enemyBullets.push({
-            x: isVertical() ? enemy.x + i * 18 : enemy.x - 32,
-            y: isVertical() ? enemy.y + 32 : enemy.y + i * 18,
-            vx: enemyBulletBaseVx(bulletSpeedMul) + (isVertical() ? i * 50 * bulletSpeedMul : 0),
-            vy: enemyBulletBaseVy(bulletSpeedMul) + (isVertical() ? 0 : i * 50 * bulletSpeedMul),
-            r: 6,
-            color: '#fca5a5',
-        });
+        return;
     }
-    enemy.fireTimer = 1.4;
-    } else if (enemy.type === 'derp') {
-        // Derp: Inaccurate shots with random spread
+
+    if (enemy.type === 'heavy') {
+        // Heavy: Triple Shot
+        for (let i = -1; i <= 1; i++) {
+            state.enemyBullets.push({
+                x: isVertical() ? enemy.x + i * 18 : enemy.x - 32,
+                y: isVertical() ? enemy.y + 32 : enemy.y + i * 18,
+                vx: enemyBulletBaseVx(bulletSpeedMul) + (isVertical() ? i * 50 * bulletSpeedMul : 0),
+                vy: enemyBulletBaseVy(bulletSpeedMul) + (isVertical() ? 0 : i * 50 * bulletSpeedMul),
+                r: 6,
+                color: '#fca5a5',
+            });
+        }
+
+        enemy.fireTimer = 1.4;
+        return;
+    }
+
+    if (enemy.type === 'derp') {
+        // Derp: ungenaue Streuschüsse
         const baseAngle = isVertical()
-            ? Math.PI / 2 + (Math.random() - 0.5) * 1.2  // Nach unten
-            : Math.PI + (Math.random() - 0.5) * 1.2;       // Nach links
+            ? Math.PI / 2 + (Math.random() - 0.5) * 1.2
+            : Math.PI + (Math.random() - 0.5) * 1.2;
+
         for (let i = 0; i < 2; i++) {
             const spread = (Math.random() - 0.5) * 0.8;
             const angle = baseAngle + spread;
+
             state.enemyBullets.push({
                 x: isVertical() ? enemy.x : enemy.x - 20,
                 y: isVertical() ? enemy.y + 20 : enemy.y,
-                vx: Math.cos(angle) * 260 * speedMul,
-                vy: Math.sin(angle) * 260 * speedMul,
+                vx: Math.cos(angle) * 260 * bulletSpeedMul,
+                vy: Math.sin(angle) * 260 * bulletSpeedMul,
                 r: 4,
                 color: '#86efac',
             });
         }
+
         enemy.fireTimer = 1.8 + Math.random() * 0.5;
-    } else if (enemy.type === 'drunk') {
-        // Drunk: Random direction shots, sometimes backwards!
+        return;
+    }
+
+    if (enemy.type === 'drunk') {
+        // Drunk: Zufallsschüsse, teils rückwärts
         const backwards = Math.random() < 0.3;
         const baseAngle = backwards
             ? (Math.random() - 0.5) * 1.5
             : isVertical()
                 ? Math.PI / 2 + (Math.random() - 0.5) * 2.0
                 : Math.PI + (Math.random() - 0.5) * 2.0;
+
         state.enemyBullets.push({
-            x: isVertical() ? (backwards ? enemy.x : enemy.x) : (backwards ? enemy.x + 20 : enemy.x - 20),
-            y: isVertical() ? (backwards ? enemy.y - 20 : enemy.y + 20) : enemy.y,
-            vx: Math.cos(baseAngle) * 280 * speedMul,
-            vy: Math.sin(baseAngle) * 280 * speedMul,
+            x: isVertical()
+                ? enemy.x
+                : backwards ? enemy.x + 20 : enemy.x - 20,
+            y: isVertical()
+                ? backwards ? enemy.y - 20 : enemy.y + 20
+                : enemy.y,
+            vx: Math.cos(baseAngle) * 280 * bulletSpeedMul,
+            vy: Math.sin(baseAngle) * 280 * bulletSpeedMul,
             r: 5,
             color: '#fde047',
         });
+
         enemy.fireTimer = 1.5 + Math.random() * 0.5;
-    } else {
-        // Drone: Standard
-        state.enemyBullets.push({
-            x: isVertical() ? enemy.x : enemy.x - 32,
-            y: isVertical() ? enemy.y + 32 : enemy.y,
-vx: enemyBulletBaseVx(bulletSpeedMul),
-vy: enemyBulletBaseVy(bulletSpeedMul) + (isVertical() ? 0 : Math.sin(enemy.t * 2) * 70 * bulletSpeedMul),
-            r: 5,
-        });
-        enemy.fireTimer = 2.1;
+        return;
     }
+
+    // Drone: Standard
+    state.enemyBullets.push({
+        x: isVertical() ? enemy.x : enemy.x - 32,
+        y: isVertical() ? enemy.y + 32 : enemy.y,
+        vx: enemyBulletBaseVx(bulletSpeedMul),
+        vy: enemyBulletBaseVy(bulletSpeedMul) + (isVertical() ? 0 : Math.sin(enemy.t * 2) * 70 * bulletSpeedMul),
+        r: 5,
+        color: '#fca5a5',
+    });
+
+    enemy.fireTimer = 2.1;
 }
 
 // --- Formation Spawning (Katakis-Style, direction-aware) ---
