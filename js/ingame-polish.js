@@ -12,6 +12,12 @@ function clamp01(value) {
     return Math.max(0, Math.min(1, value));
 }
 
+function rotateWithVerticalStage() {
+    if (isVertical()) {
+        ctx.rotate(-Math.PI / 2);
+    }
+}
+
 function roundRectPath(ctx, x, y, w, h, r) {
     const radius = Math.min(r, w / 2, h / 2);
 
@@ -140,6 +146,7 @@ function drawEnemyHitFeedback() {
 
         ctx.save();
         ctx.translate(enemy.x, enemy.y);
+        rotateWithVerticalStage();
 
         ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
         ctx.beginPath();
@@ -178,8 +185,10 @@ function drawHeavyThreatMarkers(time) {
         const hpPct = clamp01((enemy.hp || 0) / maxHp);
         const flash = enemy._polishSpawnFlash || 0;
 
+        // Glow und Zielklammern folgen der Sprite-Rotation im vertikalen Level.
         ctx.save();
         ctx.translate(enemy.x, enemy.y);
+        rotateWithVerticalStage();
 
         const glowAlpha = Math.max(0.10 + pulse * 0.08, flash * 0.42);
         ctx.fillStyle = `rgba(249, 115, 22, ${glowAlpha})`;
@@ -207,25 +216,26 @@ function drawHeavyThreatMarkers(time) {
         ctx.lineTo(bx, by);
         ctx.lineTo(bx, by - len);
         ctx.stroke();
+        ctx.restore();
 
+        // HP-Bar bleibt bewusst screen-ausgerichtet, damit sie lesbar bleibt.
         const barW = Math.max(54, enemy.w * 1.05);
         const barH = 6;
-        const barY = -enemy.h * 0.72 - 18;
+        const barY = enemy.y - enemy.h * 0.72 - 18;
+        const barX = enemy.x - barW / 2;
 
         ctx.fillStyle = 'rgba(2, 6, 23, 0.82)';
-        ctx.fillRect(-barW / 2 - 2, barY - 2, barW + 4, barH + 4);
+        ctx.fillRect(barX - 2, barY - 2, barW + 4, barH + 4);
 
         ctx.fillStyle = 'rgba(148, 163, 184, 0.34)';
-        ctx.fillRect(-barW / 2, barY, barW, barH);
+        ctx.fillRect(barX, barY, barW, barH);
 
         ctx.fillStyle = hpPct > 0.55 ? '#f97316' : hpPct > 0.25 ? '#fb923c' : '#ef4444';
-        ctx.fillRect(-barW / 2, barY, barW * hpPct, barH);
+        ctx.fillRect(barX, barY, barW * hpPct, barH);
 
         ctx.strokeStyle = 'rgba(248,250,252,.35)';
         ctx.lineWidth = 1;
-        ctx.strokeRect(-barW / 2, barY, barW, barH);
-
-        ctx.restore();
+        ctx.strokeRect(barX, barY, barW, barH);
     }
 }
 
