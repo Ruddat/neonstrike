@@ -3,6 +3,7 @@ import { state } from './state.js';
 import { getStage } from './stages.js';
 import { isVertical } from './direction.js';
 import { updateAndDrawHazards } from './hazards.js';
+import { applyBossPolish } from './boss-polish.js';
 
 const canvas = document.getElementById('game');
 const ctx = canvas?.getContext('2d');
@@ -140,17 +141,11 @@ function drawEnemyHitFeedback() {
         ctx.save();
         ctx.translate(enemy.x, enemy.y);
 
-        if (isVertical()) {
-            // Gegner-Sprites selbst sind nicht rotiert, aber das Overlay bleibt sauber am Objekt.
-        }
-
-        // Heller Impact-Kern direkt ueber dem Gegner.
         ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
         ctx.beginPath();
         ctx.ellipse(0, 0, radiusX, radiusY, 0, 0, Math.PI * 2);
         ctx.fill();
 
-        // Orange Kante fuer Heavy / starke Treffer.
         ctx.strokeStyle = enemy.type === 'heavy'
             ? `rgba(251, 146, 60, ${Math.min(0.95, flash)})`
             : `rgba(56, 189, 248, ${Math.min(0.7, flash * 0.75)})`;
@@ -159,7 +154,6 @@ function drawEnemyHitFeedback() {
         ctx.ellipse(0, 0, radiusX * 1.06, radiusY * 1.08, 0, 0, Math.PI * 2);
         ctx.stroke();
 
-        // Kleiner Kreuz-Flash, macht Treffer bei schnellen Gegnern besser lesbar.
         ctx.strokeStyle = `rgba(248, 250, 252, ${Math.min(0.85, flash * 0.7)})`;
         ctx.lineWidth = 2;
         ctx.beginPath();
@@ -187,14 +181,12 @@ function drawHeavyThreatMarkers(time) {
         ctx.save();
         ctx.translate(enemy.x, enemy.y);
 
-        // Spawn-/Threat-Glow: kurz rot-orange beim Auftauchen, danach dezente Markierung.
         const glowAlpha = Math.max(0.10 + pulse * 0.08, flash * 0.42);
         ctx.fillStyle = `rgba(249, 115, 22, ${glowAlpha})`;
         ctx.beginPath();
         ctx.ellipse(0, 0, enemy.w * 0.92 + flash * 28, enemy.h * 0.95 + flash * 20, 0, 0, Math.PI * 2);
         ctx.fill();
 
-        // Zielklammern links/rechts, damit Heavy sofort als Prioritaetsziel lesbar ist.
         ctx.strokeStyle = flash > 0.25 ? 'rgba(251, 146, 60, .95)' : 'rgba(251, 146, 60, .55)';
         ctx.lineWidth = 2;
         const bx = enemy.w * 0.58;
@@ -216,7 +208,6 @@ function drawHeavyThreatMarkers(time) {
         ctx.lineTo(bx, by - len);
         ctx.stroke();
 
-        // HP-Bar direkt ueber dem Heavy.
         const barW = Math.max(54, enemy.w * 1.05);
         const barH = 6;
         const barY = -enemy.h * 0.72 - 18;
@@ -281,7 +272,6 @@ function drawCleanHud() {
 
     ctx.save();
 
-    // Altes linkes HUD optisch ueberdecken und sauber neu zeichnen
     drawPanel(22, 18, 236, 180, 0.70);
 
     label('SCORE', 42, 34);
@@ -294,78 +284,31 @@ function drawCleanHud() {
     dotRow(117, 132, player.maxBombs || 5, player.bombs, '#f97316');
 
     label('NEXT', 42, 158, 'left', 12, '#94a3b8');
-    segmentBar(
-        92,
-        160,
-        player.maxBombFragments || 3,
-        player.bombFragments || 0,
-        18,
-        10,
-        5,
-        '#facc15'
-    );
+    segmentBar(92, 160, player.maxBombFragments || 3, player.bombFragments || 0, 18, 10, 5, '#facc15');
 
-    // Weapon Block unten links
     drawPanel(22, CONFIG.height - 116, 300, 82, 0.64);
 
     const weaponLabel = String(player.weaponType || 'laser').toUpperCase();
     label(`WPN: ${weaponLabel}  LV.${player.weaponLevel}`, 42, CONFIG.height - 98, 'left', 16);
 
-    const wpnColor = player.weaponLevel >= 4
-        ? '#ef4444'
-        : player.weaponLevel >= 3
-            ? '#f97316'
-            : '#22c55e';
+    const wpnColor = player.weaponLevel >= 4 ? '#ef4444' : player.weaponLevel >= 3 ? '#f97316' : '#22c55e';
+    segmentBar(42, CONFIG.height - 66, player.maxWeaponLevel || 5, player.weaponLevel || 1, 34, 16, 8, wpnColor);
 
-    segmentBar(
-        42,
-        CONFIG.height - 66,
-        player.maxWeaponLevel || 5,
-        player.weaponLevel || 1,
-        34,
-        16,
-        8,
-        wpnColor
-    );
-
-    // Wave mittig oben groesser und lesbarer
     if (!state.bossActive && !state.bossWarning) {
         drawPanel(CONFIG.width / 2 - 98, 16, 196, 48, 0.56);
-
         const waveColor = state.overdrive ? '#f97316' : '#38bdf8';
-
-        label(
-            `WAVE ${state.currentWave} / ${state.totalWaves}`,
-            CONFIG.width / 2,
-            24,
-            'center',
-            15,
-            waveColor
-        );
-
+        label(`WAVE ${state.currentWave} / ${state.totalWaves}`, CONFIG.width / 2, 24, 'center', 15, waveColor);
         ctx.fillStyle = 'rgba(30, 41, 59, 0.8)';
         ctx.fillRect(CONFIG.width / 2 - 70, 48, 140, 6);
-
         ctx.fillStyle = waveColor;
         ctx.fillRect(CONFIG.width / 2 - 70, 48, 140 * wavePct, 6);
     }
 
-    // Highscore rechts oben dezenter
     drawPanel(CONFIG.width - 250, 18, 206, 68, 0.50);
-
     label('HI-SCORE', CONFIG.width - 62, 34, 'right', 15);
-    value(
-        String(state.highscore || 0).padStart(7, '0'),
-        CONFIG.width - 62,
-        56,
-        'right',
-        20,
-        'rgba(248,250,252,.9)'
-    );
+    value(String(state.highscore || 0).padStart(7, '0'), CONFIG.width - 62, 56, 'right', 20, 'rgba(248,250,252,.9)');
 
-    // Level rechts unten
     drawPanel(CONFIG.width - 278, CONFIG.height - 118, 234, 82, 0.54);
-
     label(`LEVEL ${stage.level}/99`, CONFIG.width - 62, CONFIG.height - 98, 'right', 20);
     value(stage.name.toUpperCase(), CONFIG.width - 62, CONFIG.height - 66, 'right', 14, 'rgba(248,250,252,.82)');
 
@@ -383,6 +326,7 @@ export function applyIngamePolish(time = performance.now()) {
 
     tagEnemyBullets();
     updateAndDrawHazards(ctx, time);
+    applyBossPolish(ctx, time);
     drawEnemyHitFeedback();
     drawHeavyThreatMarkers(time);
     drawPlayerReadabilityRing(time);
